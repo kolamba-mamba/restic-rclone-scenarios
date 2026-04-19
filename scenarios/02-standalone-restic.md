@@ -13,9 +13,9 @@
 
 ---
 
-## 2. Скрипты
+## 2. Скрипты для Linux
 
-### Для Linux (`backup.sh`)
+### Базовый скрипт (`backup.sh`)
 
 ```bash
 #!/bin/bash
@@ -65,7 +65,63 @@ restic check >> "$LOG_FILE" 2>&1
 echo "$(date): Done" >> "$LOG_FILE"
 ```
 
-### Для Windows (`backup.ps1`)
+### Скрипт с уведомлениями Ntfy (`backup_ntfy.sh`)
+
+Полная версия скрипта, отправляющая статус работы на телефон или компьютер. Инструкция по настройке: **[Оповещения через Ntfy.sh](07-monitoring-ntfy.md)**.
+
+```bash
+#!/bin/bash
+set -euo pipefail
+
+# --- НАСТРОЙКИ ---
+NTFY_TOPIC="имя_темы"
+export RESTIC_REPOSITORY="/mnt/usb_drive/backup"
+export RESTIC_PASSWORD="ваш_пароль"
+SOURCE_DIR="/home/user/data"
+LOG_FILE="/var/log/restic_backup.log"
+
+# --- ФУНКЦИЯ УВЕДОМЛЕНИЙ ---
+send_ntfy() {
+    local MESSAGE="$1"
+    local TITLE="${2:-Notification}"
+    local TAGS="${3:-}"
+
+    curl -s \
+        -H "Title: $TITLE" \
+        -H "Tags: $TAGS" \
+        -d "$MESSAGE" \
+        "https://ntfy.sh/$NTFY_TOPIC" > /dev/null || echo "Failed to send notification"
+}
+
+# --- МОНИТОРИНГ ОШИБОК ---
+trap 'send_ntfy "❌ Backup error on $(hostname). Check log: $LOG_FILE" "Backup Failed" "warning,skull"' ERR
+
+# --- РАБОТА ---
+echo "$(date): Start" >> "$LOG_FILE"
+
+PARENT_DIR=$(dirname "$SOURCE_DIR")
+TARGET_DIR=$(basename "$SOURCE_DIR")
+cd "$PARENT_DIR" || exit
+
+# Бэкап
+restic backup "$TARGET_DIR" --tag "local" >> "$LOG_FILE" 2>&1
+
+# Очистка
+restic forget --keep-daily 7 --keep-weekly 4 --keep-monthly 12 --prune >> "$LOG_FILE" 2>&1
+
+# Проверка
+restic check >> "$LOG_FILE" 2>&1
+
+echo "$(date): Done" >> "$LOG_FILE"
+
+send_ntfy "✅ Backup on $(hostname) completed successfully." "Success" "heavy_check_mark"
+```
+
+---
+
+## 3. Скрипты для Windows
+
+### Базовый скрипт (`backup.ps1`)
 
 ```powershell
 # --- НАСТРОЙКИ ---
@@ -129,63 +185,9 @@ $ErrorActionPreference = "Stop"
 Add-Content $LogFile "$(Get-Date): Done"
 ```
 
----
+### Скрипт с уведомлениями Ntfy (`backup_ntfy.ps1`)
 
-## 3. Скрипты с уведомлениями через Ntfy.sh
-
-Полные версии скриптов, отправляющие статус работы на телефон или компьютер. Инструкция по настройке: **[Оповещения через Ntfy.sh](07-monitoring-ntfy.md)**.
-
-### Для Linux (`backup_ntfy.sh`)
-
-```bash
-#!/bin/bash
-set -euo pipefail
-
-# --- НАСТРОЙКИ ---
-NTFY_TOPIC="имя_темы"
-export RESTIC_REPOSITORY="/mnt/usb_drive/backup"
-export RESTIC_PASSWORD="ваш_пароль"
-SOURCE_DIR="/home/user/data"
-LOG_FILE="/var/log/restic_backup.log"
-
-# --- ФУНКЦИЯ УВЕДОМЛЕНИЙ ---
-send_ntfy() {
-    local MESSAGE="$1"
-    local TITLE="${2:-Notification}"
-    local TAGS="${3:-}"
-
-    curl -s \
-        -H "Title: $TITLE" \
-        -H "Tags: $TAGS" \
-        -d "$MESSAGE" \
-        "https://ntfy.sh/$NTFY_TOPIC" > /dev/null || echo "Failed to send notification"
-}
-
-# --- МОНИТОРИНГ ОШИБОК ---
-trap 'send_ntfy "❌ Backup error on $(hostname). Check log: $LOG_FILE" "Backup Failed" "warning,skull"' ERR
-
-# --- РАБОТА ---
-echo "$(date): Start" >> "$LOG_FILE"
-
-PARENT_DIR=$(dirname "$SOURCE_DIR")
-TARGET_DIR=$(basename "$SOURCE_DIR")
-cd "$PARENT_DIR" || exit
-
-# Бэкап
-restic backup "$TARGET_DIR" --tag "local" >> "$LOG_FILE" 2>&1
-
-# Очистка
-restic forget --keep-daily 7 --keep-weekly 4 --keep-monthly 12 --prune >> "$LOG_FILE" 2>&1
-
-# Проверка
-restic check >> "$LOG_FILE" 2>&1
-
-echo "$(date): Done" >> "$LOG_FILE"
-
-send_ntfy "✅ Backup on $(hostname) completed successfully." "Success" "heavy_check_mark"
-```
-
-### Для Windows (`backup_ntfy.ps1`)
+Полная версия скрипта, отправляющая статус работы на телефон или компьютер. Инструкция по настройке: **[Оповещения через Ntfy.sh](07-monitoring-ntfy.md)**.
 
 ```powershell
 $ErrorActionPreference = "Stop"

@@ -13,9 +13,9 @@
 
 ---
 
-## 2. Скрипты
+## 2. Скрипты для Linux
 
-### Для Linux (`rclone_sync.sh`)
+### Базовый скрипт (`rclone_sync.sh`)
 
 ```bash
 #!/bin/bash
@@ -51,45 +51,9 @@ rclone --config "$RCLONE_CONF" sync "$SOURCE" "$DEST" \
 echo "$(date): Done" >> "$LOG_FILE"
 ```
 
-### Для Windows (`rclone_sync.ps1`)
+### Скрипт с уведомлениями Ntfy (`rclone_sync_ntfy.sh`)
 
-```powershell
-# --- НАСТРОЙКИ ---
-$ErrorActionPreference = "Stop"
-# Полный путь к программе (обязательно для Планировщика)
-$RcloneExe  = "$env:USERPROFILE\scoop\shims\rclone.exe" 
-# Если установлен не через Scoop, укажите точный путь, например: "C:\Program Files\rclone\rclone.exe"
-$SourceDir  = "C:\Users\Admin\Documents"
-# Путь к настройкам rclone
-$RcloneConf = "$env:USERPROFILE\scoop\apps\rclone\current\rclone.conf"
-# Куда копируем:
-$DestDir    = "gdrive:backup_mirror"
-$LogFile    = "C:\Logs\rclone_sync.log"
-
-# --- РАБОТА ---
-Add-Content $LogFile "$(Get-Date): Start"
-
-# Варианты копирования:
-# & $RcloneExe --config $RcloneConf sync "$SourceDir" "$DestDir"        # Синхронизация (удаляет лишнее в копии)
-# & $RcloneExe --config $RcloneConf copy "$SourceDir" "$DestDir"        # Копирование (не удаляет лишнее)
-# & $RcloneExe --config $RcloneConf move "$SourceDir" "$DestDir"        # Перемещение (удаляет оригинал)
-
-# Запуск с полным путем:
-& $RcloneExe --config $RcloneConf sync "$SourceDir" "$DestDir" `
-    --progress `
-    --log-file "$LogFile" `
-    --checksum `
-    --transfers 4
-
-Add-Content $LogFile "$(Get-Date): Done"
-```
-
----
-
-## 3. Скрипты с уведомлениями через Ntfy.sh
-
-Полные версии скриптов, отправляющие статус работы на телефон или компьютер. Инструкция по настройке: **[Оповещения через Ntfy.sh](07-monitoring-ntfy.md)**.
-### Для Linux (`rclone_sync_ntfy.sh`)
+Полная версия скрипта, отправляющая статус работы на телефон или компьютер. Инструкция по настройке: **[Оповещения через Ntfy.sh](07-monitoring-ntfy.md)**.
 
 ```bash
 #!/bin/bash
@@ -135,7 +99,46 @@ echo "$(date): --- Done ---" >> "$LOG_FILE"
 send_ntfy "✅ Sync on $(hostname) completed successfully." "Success" "heavy_check_mark"
 ```
 
-### Для Windows (`rclone_sync_ntfy.ps1`)
+---
+
+## 3. Скрипты для Windows
+
+### Базовый скрипт (`rclone_sync.ps1`)
+
+```powershell
+# --- НАСТРОЙКИ ---
+$ErrorActionPreference = "Stop"
+# Полный путь к программе (обязательно для Планировщика)
+$RcloneExe  = "$env:USERPROFILE\scoop\shims\rclone.exe" 
+# Если установлен не через Scoop, укажите точный путь, например: "C:\Program Files\rclone\rclone.exe"
+$SourceDir  = "C:\Users\Admin\Documents"
+# Путь к настройкам rclone
+$RcloneConf = "$env:USERPROFILE\scoop\apps\rclone\current\rclone.conf"
+# Куда копируем:
+$DestDir    = "gdrive:backup_mirror"
+$LogFile    = "C:\Logs\rclone_sync.log"
+
+# --- РАБОТА ---
+Add-Content $LogFile "$(Get-Date): Start"
+
+# Варианты копирования:
+# & $RcloneExe --config $RcloneConf sync "$SourceDir" "$DestDir"        # Синхронизация (удаляет лишнее в копии)
+# & $RcloneExe --config $RcloneConf copy "$SourceDir" "$DestDir"        # Копирование (не удаляет лишнее)
+# & $RcloneExe --config $RcloneConf move "$SourceDir" "$DestDir"        # Перемещение (удаляет оригинал)
+
+# Запуск с полным путем:
+& $RcloneExe --config $RcloneConf sync "$SourceDir" "$DestDir" `
+    --progress `
+    --log-file "$LogFile" `
+    --checksum `
+    --transfers 4
+
+Add-Content $LogFile "$(Get-Date): Done"
+```
+
+### Скрипт с уведомлениями Ntfy (`rclone_sync_ntfy.ps1`)
+
+Полная версия скрипта, отправляющая статус работы на телефон или компьютер. Инструкция по настройке: **[Оповещения через Ntfy.sh](07-monitoring-ntfy.md)**.
 
 ```powershell
 $ErrorActionPreference = "Stop"
