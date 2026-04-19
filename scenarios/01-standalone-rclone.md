@@ -109,11 +109,12 @@ send_ntfy "✅ Sync on $(hostname) completed successfully." "Success" "heavy_che
 # --- НАСТРОЙКИ ---
 $ErrorActionPreference = "Stop"
 # Полный путь к программе (обязательно для Планировщика)
-$RcloneExe  = "$env:USERPROFILE\scoop\shims\rclone.exe" 
-# Если установлен не через Scoop, укажите точный путь, например: "C:\Program Files\rclone\rclone.exe"
+# ВАЖНО: Если Планировщик работает от имени SYSTEM, $env:USERPROFILE использовать нельзя!
+$RcloneExe  = "C:\Users\Admin\scoop\shims\rclone.exe" 
+# Если установлен системно, укажите точный путь: "C:\Program Files\rclone\rclone.exe"
 $SourceDir  = "C:\Users\Admin\Documents"
 # Путь к настройкам rclone
-$RcloneConf = "$env:USERPROFILE\scoop\apps\rclone\current\rclone.conf"
+$RcloneConf = "C:\Users\Admin\scoop\apps\rclone\current\rclone.conf"
 # Куда копируем:
 $DestDir    = "gdrive:backup_mirror"
 $LogFile    = "C:\Logs\rclone_sync.log"
@@ -146,11 +147,11 @@ $ErrorActionPreference = "Stop"
 # --- НАСТРОЙКИ ---
 $NtfyTopic = "ваше_имя_темы"
 
-# Полный путь к программе (обязательно для работы в Планировщике)
-$RcloneExe  = "$env:USERPROFILE\scoop\shims\rclone.exe" 
+# ВАЖНО: Если Планировщик работает от имени SYSTEM, $env:USERPROFILE использовать нельзя!
+$RcloneExe  = "C:\Users\Admin\scoop\shims\rclone.exe" 
 
 $SourceDir  = "C:\Users\Admin\Documents"
-$RcloneConf = "$env:USERPROFILE\scoop\apps\rclone\current\rclone.conf"
+$RcloneConf = "C:\Users\Admin\scoop\apps\rclone\current\rclone.conf"
 $DestDir    = "gdrive:backup_mirror"
 $LogFile    = "C:\Logs\rclone_sync.log"
 

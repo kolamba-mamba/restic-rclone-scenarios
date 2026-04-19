@@ -25,6 +25,8 @@ set -euo pipefail
 export RESTIC_REPOSITORY="/mnt/usb_drive/backup"
 # Если используете SFTP:
 # export RESTIC_REPOSITORY="sftp:user@host:/path/to/repo"
+# Если используете облако (Google Drive) через Rclone:
+# export RESTIC_REPOSITORY="rclone:gdrive:backup_repo"
 
 export RESTIC_PASSWORD="ваш_пароль"
 # Можно хранить пароль в файле:
@@ -75,7 +77,12 @@ set -euo pipefail
 
 # --- НАСТРОЙКИ ---
 NTFY_TOPIC="имя_темы"
+
+# Где лежит хранилище
 export RESTIC_REPOSITORY="/mnt/usb_drive/backup"
+# Если используете облако (Google Drive) через Rclone:
+# export RESTIC_REPOSITORY="rclone:gdrive:backup_repo"
+
 export RESTIC_PASSWORD="ваш_пароль"
 SOURCE_DIR="/home/user/data"
 LOG_FILE="/var/log/restic_backup.log"
@@ -137,6 +144,11 @@ $ResticExe = "C:\Users\Admin\scoop\shims\restic.exe"
 $env:RESTIC_REPOSITORY = "D:\Backup\repo"
 # Если используете SFTP:
 # $env:RESTIC_REPOSITORY = "sftp:user@host:/path/to/repo"
+# Если используете облако (Google Drive) через Rclone:
+# $env:RESTIC_REPOSITORY = "rclone:gdrive:backup_repo"
+# ВАЖНО: Чтобы Планировщик (SYSTEM) нашел Rclone из Scoop, добавьте пути:
+# $env:PATH += ";C:\Users\Admin\scoop\shims"
+# $env:RCLONE_CONFIG = "C:\Users\Admin\scoop\apps\rclone\current\rclone.conf"
 
 $env:RESTIC_PASSWORD   = "ваш_пароль"
 # Можно хранить пароль в файле:
@@ -198,7 +210,14 @@ $NtfyTopic = "ваше_имя_темы"
 # ВАЖНО: Если Планировщик работает от имени SYSTEM, $env:USERPROFILE использовать нельзя!
 $ResticExe = "C:\Users\Admin\scoop\shims\restic.exe"
 
+# Где лежит хранилище
 $env:RESTIC_REPOSITORY = "D:\Backup\repo"
+# Если используете облако (Google Drive) через Rclone:
+# $env:RESTIC_REPOSITORY = "rclone:gdrive:backup_repo"
+# ВАЖНО: Чтобы Планировщик (SYSTEM) нашел Rclone из Scoop, добавьте пути:
+# $env:PATH += ";C:\Users\Admin\scoop\shims"
+# $env:RCLONE_CONFIG = "C:\Users\Admin\scoop\apps\rclone\current\rclone.conf"
+
 $env:RESTIC_PASSWORD   = "ваш_пароль"
 $SourceDir             = "C:\Users\Admin\Documents"
 $LogFile               = "C:\Logs\backup.log"
