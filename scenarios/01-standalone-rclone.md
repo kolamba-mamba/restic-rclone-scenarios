@@ -32,7 +32,7 @@ DEST="gdrive:backup_mirror"      # В облако
 # DEST="local_drive:/mnt/backup" # На диск
 
 # --- РАБОТА ---
-echo "$(date): Старт" >> $LOG_FILE
+echo "$(date): Start" >> "$LOG_FILE"
 
 # Варианты копирования:
 # rclone --config "$RCLONE_CONF" sync "$SOURCE" "$DEST"        # Синхронизация (удаляет лишнее в копии)
@@ -48,7 +48,7 @@ rclone --config "$RCLONE_CONF" sync "$SOURCE" "$DEST" \
     --checksum \
     --transfers 4
 
-echo "$(date): Готово" >> $LOG_FILE
+echo "$(date): Done" >> "$LOG_FILE"
 ```
 
 ### Для Windows (`rclone_sync.ps1`)
@@ -67,7 +67,12 @@ $DestDir    = "gdrive:backup_mirror"
 $LogFile    = "C:\Logs\rclone_sync.log"
 
 # --- РАБОТА ---
-Add-Content $LogFile "$(Get-Date): Старт"
+Add-Content $LogFile "$(Get-Date): Start"
+
+# Варианты копирования:
+# & $RcloneExe --config $RcloneConf sync "$SourceDir" "$DestDir"        # Синхронизация (удаляет лишнее в копии)
+# & $RcloneExe --config $RcloneConf copy "$SourceDir" "$DestDir"        # Копирование (не удаляет лишнее)
+# & $RcloneExe --config $RcloneConf move "$SourceDir" "$DestDir"        # Перемещение (удаляет оригинал)
 
 # Запуск с полным путем:
 & $RcloneExe --config $RcloneConf sync "$SourceDir" "$DestDir" `
@@ -76,7 +81,7 @@ Add-Content $LogFile "$(Get-Date): Старт"
     --checksum `
     --transfers 4
 
-Add-Content $LogFile "$(Get-Date): Готово"
+Add-Content $LogFile "$(Get-Date): Done"
 ```
 
 ---
@@ -101,7 +106,7 @@ LOG_FILE="/var/log/rclone_sync.log"
 # --- ФУНКЦИЯ УВЕДОМЛЕНИЙ ---
 send_ntfy() {
     local MESSAGE="$1"
-    local TITLE="${2:-Уведомление}"
+    local TITLE="${2:-Notification}"
     local TAGS="${3:-}"
 
     # Отправка данных в ntfy.sh:
@@ -109,15 +114,15 @@ send_ntfy() {
         -H "Title: $TITLE" \
         -H "Tags: $TAGS" \
         -d "$MESSAGE" \
-        "https://ntfy.sh/$NTFY_TOPIC" > /dev/null || echo "Ошибка отправки уведомления"
+        "https://ntfy.sh/$NTFY_TOPIC" > /dev/null || echo "Failed to send notification"
 }
 
 # --- МОНИТОРИНГ ОШИБОК ---
 # Перехват сбоев для отправки уведомления:
-trap 'send_ntfy "❌ Ошибка синхронизации на $(hostname). Проверьте лог: $LOG_FILE" "Сбой бэкапа" "warning,skull"' ERR
+trap 'send_ntfy "❌ Sync error on $(hostname). Check log: $LOG_FILE" "Backup Failed" "warning,skull"' ERR
 
 # --- РАБОТА ---
-echo "$(date): --- Старт синхронизации ---" >> "$LOG_FILE"
+echo "$(date): --- Start sync ---" >> "$LOG_FILE"
 
 # Синхронизация данных:
 rclone --config "$RCLONE_CONF" sync "$SOURCE" "$DEST" \
@@ -125,9 +130,9 @@ rclone --config "$RCLONE_CONF" sync "$SOURCE" "$DEST" \
     --checksum \
     --transfers 4
 
-echo "$(date): --- Готово ---" >> "$LOG_FILE"
+echo "$(date): --- Done ---" >> "$LOG_FILE"
 
-send_ntfy "✅ Синхронизация на $(hostname) завершена успешно." "Успех" "heavy_check_mark"
+send_ntfy "✅ Sync on $(hostname) completed successfully." "Success" "heavy_check_mark"
 ```
 
 ### Для Windows (`rclone_sync_ntfy.ps1`)
@@ -147,7 +152,7 @@ $DestDir    = "gdrive:backup_mirror"
 $LogFile    = "C:\Logs\rclone_sync.log"
 
 # --- ФУНКЦИЯ УВЕДОМЛЕНИЙ ---
-function Send-Ntfy ($Message, $Title = "Уведомление", $Tags = "") {
+function Send-Ntfy ($Message, $Title = "Notification", $Tags = "") {
     $Topic = "$NtfyTopic".Trim().Trim("/")
     if (-not $Topic) { return }
 
@@ -163,13 +168,13 @@ function Send-Ntfy ($Message, $Title = "Уведомление", $Tags = "") {
         Invoke-RestMethod -Uri $Url -Method Post -Body $Body -ErrorAction Stop | Out-Null
     }
     catch {
-        Write-Warning "Не удалось отправить уведомление: $($_.Exception.Message)"
+        Write-Warning "Failed to send notification: $($_.Exception.Message)"
     }
 }
 
 # --- РАБОТА (С МОНИТОРИНГОМ) ---
 try {
-    Add-Content $LogFile "$(Get-Date): Старт"
+    Add-Content $LogFile "$(Get-Date): Start"
 
     # Запуск rclone через оператор & с полным путем
     & $RcloneExe --config $RcloneConf sync "$SourceDir" "$DestDir" `
@@ -179,14 +184,14 @@ try {
 
     # Проверка: если rclone вернул не 0, значит случилась ошибка
     if ($LASTEXITCODE -ne 0) {
-        throw "Rclone завершился с ошибкой (код: $LASTEXITCODE). Проверьте журнал: $LogFile"
+        throw "Rclone failed with exit code $LASTEXITCODE. Check log: $LogFile"
     }
 
-    Add-Content $LogFile "$(Get-Date): Готово"
-    Send-Ntfy "✅ Синхронизация на $($env:COMPUTERNAME) завершена успешно." "Успех" "heavy_check_mark"
+    Add-Content $LogFile "$(Get-Date): Done"
+    Send-Ntfy "✅ Sync on $($env:COMPUTERNAME) completed successfully." "Success" "heavy_check_mark"
 }
 catch {
-    Send-Ntfy "❌ Ошибка на $($env:COMPUTERNAME): $($_.Exception.Message)" "Сбой бэкапа" "warning,skull"
+    Send-Ntfy "❌ Error on $($env:COMPUTERNAME): $($_.Exception.Message)" "Backup Failed" "warning,skull"
     throw
 }
 ```

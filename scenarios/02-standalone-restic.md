@@ -37,7 +37,7 @@ LOG_FILE="/var/log/restic_backup.log"
 # restic init
 
 # --- РАБОТА ---
-echo "$(date): Старт" >> "$LOG_FILE"
+echo "$(date): Start" >> "$LOG_FILE"
 
 # Переходим в папку с данными, чтобы пути в бэкапе были короткими
 PARENT_DIR=$(dirname "$SOURCE_DIR")
@@ -62,7 +62,7 @@ restic forget --keep-daily 7 --keep-weekly 4 --keep-monthly 12 --prune >> "$LOG_
 # Проверка данных на ошибки
 restic check >> "$LOG_FILE" 2>&1
 
-echo "$(date): Готово" >> "$LOG_FILE"
+echo "$(date): Done" >> "$LOG_FILE"
 ```
 
 ### Для Windows (`backup.ps1`)
@@ -72,6 +72,8 @@ echo "$(date): Готово" >> "$LOG_FILE"
 $ErrorActionPreference = "Stop"
 
 # Полный путь к программе (обязательно для Планировщика)
+# ВАЖНО: Если Планировщик работает от имени SYSTEM, $env:USERPROFILE использовать нельзя!
+# Укажите жесткий путь к программе:
 $ResticExe = "C:\Users\Admin\scoop\shims\restic.exe"
 # Если установлен системно: "C:\Program Files\restic\restic.exe"
 
@@ -91,7 +93,7 @@ $LogFile               = "C:\Logs\backup.log"
 # & $ResticExe init
 
 # --- РАБОТА ---
-Add-Content $LogFile "$(Get-Date): Старт"
+Add-Content $LogFile "$(Get-Date): Start"
 
 # Переходим в папку с данными, чтобы пути в бэкапе были короткими
 $ParentDir = Split-Path -Path $SourceDir -Parent
@@ -108,7 +110,7 @@ $ErrorActionPreference = "Continue"
 
 # Делаем бэкап
 & $ResticExe backup "$TargetDir" --tag "local" 2>&1 | Out-File -FilePath "$LogFile" -Append
-if ($LASTEXITCODE -ne 0) { Write-Warning "Ошибка Restic backup (код: $LASTEXITCODE)" }
+if ($LASTEXITCODE -ne 0) { Write-Warning "Restic backup error (code: $LASTEXITCODE)" }
 
 # Варианты очистки старых копий:
 # & $ResticExe forget --keep-last 10 --prune 2>&1 | Out-File -FilePath "$LogFile" -Append
@@ -116,15 +118,15 @@ if ($LASTEXITCODE -ne 0) { Write-Warning "Ошибка Restic backup (код: $L
 
 # Удаляем старые копии
 & $ResticExe forget --keep-daily 7 --keep-weekly 4 --keep-monthly 12 --prune 2>&1 | Out-File -FilePath "$LogFile" -Append
-if ($LASTEXITCODE -ne 0) { Write-Warning "Ошибка Restic forget (код: $LASTEXITCODE)" }
+if ($LASTEXITCODE -ne 0) { Write-Warning "Restic forget error (code: $LASTEXITCODE)" }
 
 # Проверка данных на ошибки
 & $ResticExe check 2>&1 | Out-File -FilePath "$LogFile" -Append
-if ($LASTEXITCODE -ne 0) { Write-Warning "Ошибка Restic check (код: $LASTEXITCODE)" }
+if ($LASTEXITCODE -ne 0) { Write-Warning "Restic check error (code: $LASTEXITCODE)" }
 
 $ErrorActionPreference = "Stop"
 
-Add-Content $LogFile "$(Get-Date): Готово"
+Add-Content $LogFile "$(Get-Date): Done"
 ```
 
 ---
@@ -149,21 +151,21 @@ LOG_FILE="/var/log/restic_backup.log"
 # --- ФУНКЦИЯ УВЕДОМЛЕНИЙ ---
 send_ntfy() {
     local MESSAGE="$1"
-    local TITLE="${2:-Уведомление}"
+    local TITLE="${2:-Notification}"
     local TAGS="${3:-}"
 
     curl -s \
         -H "Title: $TITLE" \
         -H "Tags: $TAGS" \
         -d "$MESSAGE" \
-        "https://ntfy.sh/$NTFY_TOPIC" > /dev/null || echo "Ошибка отправки уведомления"
+        "https://ntfy.sh/$NTFY_TOPIC" > /dev/null || echo "Failed to send notification"
 }
 
 # --- МОНИТОРИНГ ОШИБОК ---
-trap 'send_ntfy "❌ Ошибка бэкапа на $(hostname). Проверьте лог: $LOG_FILE" "Сбой бэкапа" "warning,skull"' ERR
+trap 'send_ntfy "❌ Backup error on $(hostname). Check log: $LOG_FILE" "Backup Failed" "warning,skull"' ERR
 
 # --- РАБОТА ---
-echo "$(date): Старт" >> "$LOG_FILE"
+echo "$(date): Start" >> "$LOG_FILE"
 
 PARENT_DIR=$(dirname "$SOURCE_DIR")
 TARGET_DIR=$(basename "$SOURCE_DIR")
@@ -178,9 +180,9 @@ restic forget --keep-daily 7 --keep-weekly 4 --keep-monthly 12 --prune >> "$LOG_
 # Проверка
 restic check >> "$LOG_FILE" 2>&1
 
-echo "$(date): Готово" >> "$LOG_FILE"
+echo "$(date): Done" >> "$LOG_FILE"
 
-send_ntfy "✅ Бэкап на $(hostname) завершен успешно." "Успех" "heavy_check_mark"
+send_ntfy "✅ Backup on $(hostname) completed successfully." "Success" "heavy_check_mark"
 ```
 
 ### Для Windows (`backup_ntfy.ps1`)
@@ -191,7 +193,7 @@ $ErrorActionPreference = "Stop"
 # --- НАСТРОЙКИ ---
 $NtfyTopic = "ваше_имя_темы"
 
-# Полный путь к программе (обязательно для Планировщика)
+# ВАЖНО: Если Планировщик работает от имени SYSTEM, $env:USERPROFILE использовать нельзя!
 $ResticExe = "C:\Users\Admin\scoop\shims\restic.exe"
 
 $env:RESTIC_REPOSITORY = "D:\Backup\repo"
@@ -200,7 +202,7 @@ $SourceDir             = "C:\Users\Admin\Documents"
 $LogFile               = "C:\Logs\backup.log"
 
 # --- ФУНКЦИЯ УВЕДОМЛЕНИЙ ---
-function Send-Ntfy ($Message, $Title = "Уведомление", $Tags = "") {
+function Send-Ntfy ($Message, $Title = "Notification", $Tags = "") {
     $Topic = "$NtfyTopic".Trim().Trim("/")
     if (-not $Topic) { return }
 
@@ -215,13 +217,13 @@ function Send-Ntfy ($Message, $Title = "Уведомление", $Tags = "") {
         Invoke-RestMethod -Uri $Url -Method Post -Body $Body -ErrorAction Stop | Out-Null
     }
     catch {
-        Write-Warning "Не удалось отправить уведомление: $($_.Exception.Message)"
+        Write-Warning "Failed to send notification: $($_.Exception.Message)"
     }
 }
 
 # --- РАБОТА (С МОНИТОРИНГОМ) ---
 try {
-    Add-Content $LogFile "$(Get-Date): Старт"
+    Add-Content $LogFile "$(Get-Date): Start"
 
     $ParentDir = Split-Path -Path $SourceDir -Parent
     $TargetDir = Split-Path -Path $SourceDir -Leaf
@@ -232,23 +234,23 @@ try {
 
     # Бэкап
     & $ResticExe backup "$TargetDir" --tag "local" 2>&1 | Out-File -FilePath "$LogFile" -Append
-    if ($LASTEXITCODE -ne 0) { throw "Restic backup завершился с ошибкой (код: $LASTEXITCODE)." }
+    if ($LASTEXITCODE -ne 0) { throw "Restic backup failed (code: $LASTEXITCODE)." }
 
     # Очистка
     & $ResticExe forget --keep-daily 7 --keep-weekly 4 --keep-monthly 12 --prune 2>&1 | Out-File -FilePath "$LogFile" -Append
-    if ($LASTEXITCODE -ne 0) { throw "Restic forget завершился с ошибкой (код: $LASTEXITCODE)." }
+    if ($LASTEXITCODE -ne 0) { throw "Restic forget failed (code: $LASTEXITCODE)." }
 
     # Проверка
     & $ResticExe check 2>&1 | Out-File -FilePath "$LogFile" -Append
-    if ($LASTEXITCODE -ne 0) { throw "Restic check завершился с ошибкой (код: $LASTEXITCODE)." }
+    if ($LASTEXITCODE -ne 0) { throw "Restic check failed (code: $LASTEXITCODE)." }
 
     $ErrorActionPreference = "Stop"
 
-    Add-Content $LogFile "$(Get-Date): Готово"
-    Send-Ntfy "✅ Бэкап на $($env:COMPUTERNAME) завершен успешно." "Успех" "heavy_check_mark"
+    Add-Content $LogFile "$(Get-Date): Done"
+    Send-Ntfy "✅ Backup on $($env:COMPUTERNAME) completed successfully." "Success" "heavy_check_mark"
 }
 catch {
-    Send-Ntfy "❌ Ошибка на $($env:COMPUTERNAME): $($_.Exception.Message). Проверьте журнал: $LogFile" "Сбой бэкапа" "warning,skull"
+    Send-Ntfy "❌ Error on $($env:COMPUTERNAME): $($_.Exception.Message). Check log: $LogFile" "Backup Failed" "warning,skull"
     throw
 }
 ```
