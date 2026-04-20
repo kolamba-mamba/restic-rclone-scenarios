@@ -1,15 +1,16 @@
 # Работа с Rclone: Синхронизация данных
 
-Как копировать файлы один-в-один без сохранения старых версий.
+Описание процессов копирования файлов один-в-один без сохранения версий. Данный метод создает зеркальную копию данных в одном или нескольких хранилищах. Настройка скриптов под конкретные задачи выполняется посредством комментирования или раскомментирования строк в блоке параметров.
 
 ---
 
 ## 1. Подготовка
 
-Перед запуском скриптов требуется выполнение следующих предварительных условий:
+Перед запуском скриптов учитываются следующие условия:
 
-*   **Установка программ:** Установка Rclone (см. [Установку](../README.md#1-установка)).
-*   **Настройка облака:** Создание подключения в Rclone (см. [Настройку облака](00-rclone-config.md)).
+*   **Установка программ:** Наличие установленного Rclone (см. [Установку](../README.md#1-установка)).
+*   **Настройка облака:** **Если** планируется использование облака, требуется наличие созданного подключения в Rclone (см. [Настройку облака](00-rclone-config.md)).
+*   **Файл настроек:** Знание абсолютного пути к файлу `rclone.conf`.
 
 ---
 
@@ -20,52 +21,92 @@
 ```bash
 #!/bin/bash
 set -euo pipefail
+
 # --- НАСТРОЙКИ ---
-SOURCE="/home/user/documents"
-# Путь к настройкам rclone (узнать путь: rclone config file)
+
+# Программа (Путь к конфигу)
 RCLONE_CONF="/home/user/.config/rclone/rclone.conf"
-# Файл журнала
+
+# Источники (Варианты: Один / Массив папок)
+SOURCE="/home/user/documents"
+# SOURCE=("/home/user/data" "/var/www/html")
+
+# Назначение (Варианты: Одно / Массив назначений)
+DEST="gdrive:backup_mirror"
+# DEST=("gdrive:backup" "onedrive:backup" "/mnt/usb_drive/backup")
+
+# Параметры (Варианты: sync: зеркало / copy: копирование / move: перемещение)
+RCLONE_CMD="sync"
+# RCLONE_CMD="copy"
+# RCLONE_CMD="move"
+
+# Дополнительно (Варианты: Проверка контрольных сумм / Потоки)
+RCLONE_OPTS="--checksum --transfers 4 --progress"
+
+# Логирование
 LOG_FILE="/var/log/rclone_sync.log"
 
-# Куда копируем:
-DEST="gdrive:backup_mirror"      # В облако
-# DEST="local_drive:/mnt/backup" # На диск
 
 # --- РАБОТА ---
-echo "$(date): Start" >> "$LOG_FILE"
+echo "$(date): --- Start ---" >> "$LOG_FILE"
 
-# Варианты копирования:
-# rclone --config "$RCLONE_CONF" sync "$SOURCE" "$DEST"        # Синхронизация (удаляет лишнее в копии)
-# rclone --config "$RCLONE_CONF" copy "$SOURCE" "$DEST"        # Копирование (не удаляет лишнее)
-# rclone --config "$RCLONE_CONF" move "$SOURCE" "$DEST"        # Перемещение (удаляет оригинал)
+# Приведение источников и назначений к массивам
+if [[ "$(declare -p SOURCE 2>/dev/null)" =~ "declare -a" ]]; then
+    SOURCES_ARR=("${SOURCE[@]}")
+else
+    SOURCES_ARR=("$SOURCE")
+fi
 
-# Запуск:
-# --progress: показывать процесс; --log-file: писать в журнал; 
-# --checksum: проверять файлы; --transfers: число потоков.
-rclone --config "$RCLONE_CONF" sync "$SOURCE" "$DEST" \
-    --progress \
-    --log-file="$LOG_FILE" \
-    --checksum \
-    --transfers 4
+if [[ "$(declare -p DEST 2>/dev/null)" =~ "declare -a" ]]; then
+    DESTS_ARR=("${DEST[@]}")
+else
+    DESTS_ARR=("$DEST")
+fi
 
-echo "$(date): Done" >> "$LOG_FILE"
+# Цикл по источникам и назначениям
+for src in "${SOURCES_ARR[@]}"; do
+    for dst in "${DESTS_ARR[@]}"; do
+        echo "$(date): Processing $src -> $dst" >> "$LOG_FILE"
+        rclone --config "$RCLONE_CONF" "$RCLONE_CMD" "$src" "$dst" \
+            --log-file="$LOG_FILE" \
+            $RCLONE_OPTS
+    done
+done
+
+echo "$(date): --- Done ---" >> "$LOG_FILE"
 ```
 
 ### Скрипт с уведомлениями Ntfy (`rclone_sync_ntfy.sh`)
-
-Полная версия скрипта, отправляющая статус работы на телефон или компьютер. Инструкция по настройке: **[Оповещения через Ntfy.sh](07-monitoring-ntfy.md)**.
 
 ```bash
 #!/bin/bash
 set -euo pipefail
 
 # --- НАСТРОЙКИ ---
-# Уникальное имя темы (topic) для подписки в приложении ntfy:
+
+# Оповещения (Вариант: Тема ntfy.sh)
 NTFY_TOPIC="имя_темы"
-SOURCE="/home/user/documents"
+
+# Программа (Путь к конфигу)
 RCLONE_CONF="/home/user/.config/rclone/rclone.conf"
+
+# Источники (Варианты: Один / Массив)
+SOURCE="/home/user/documents"
+# SOURCE=("/home/user/data" "/var/www/html")
+
+# Назначение (Варианты: Одно / Массив)
 DEST="gdrive:backup_mirror"
+# DEST=("gdrive:backup" "onedrive:backup")
+
+# Параметры (Варианты: sync / copy)
+RCLONE_CMD="sync"
+
+# Дополнительно (Варианты: Проверка контрольных сумм / Потоки)
+RCLONE_OPTS="--checksum --transfers 4"
+
+# Логирование
 LOG_FILE="/var/log/rclone_sync.log"
+
 
 # --- ФУНКЦИЯ УВЕДОМЛЕНИЙ ---
 send_ntfy() {
@@ -73,7 +114,6 @@ send_ntfy() {
     local TITLE="${2:-Notification}"
     local TAGS="${3:-}"
 
-    # Отправка данных в ntfy.sh:
     curl -s \
         -H "Title: $TITLE" \
         -H "Tags: $TAGS" \
@@ -82,21 +122,37 @@ send_ntfy() {
 }
 
 # --- МОНИТОРИНГ ОШИБОК ---
-# Перехват сбоев для отправки уведомления:
-trap 'send_ntfy "❌ Sync error on $(hostname). Check log: $LOG_FILE" "Backup Failed" "warning,skull"' ERR
+CURRENT_PAIR="Initialization"
+trap 'send_ntfy "❌ Error: $CURRENT_PAIR failed. Check log: $LOG_FILE" "Sync Failed" "warning,skull"' ERR
 
 # --- РАБОТА ---
-echo "$(date): --- Start sync ---" >> "$LOG_FILE"
+echo "$(date): --- Start ---" >> "$LOG_FILE"
 
-# Синхронизация данных:
-rclone --config "$RCLONE_CONF" sync "$SOURCE" "$DEST" \
-    --log-file="$LOG_FILE" \
-    --checksum \
-    --transfers 4
+if [[ "$(declare -p SOURCE 2>/dev/null)" =~ "declare -a" ]]; then
+    SOURCES_ARR=("${SOURCE[@]}")
+else
+    SOURCES_ARR=("$SOURCE")
+fi
+
+if [[ "$(declare -p DEST 2>/dev/null)" =~ "declare -a" ]]; then
+    DESTS_ARR=("${DEST[@]}")
+else
+    DESTS_ARR=("$DEST")
+fi
+
+COUNT=0
+for src in "${SOURCES_ARR[@]}"; do
+    for dst in "${DESTS_ARR[@]}"; do
+        CURRENT_PAIR="$src -> $dst"
+        rclone --config "$RCLONE_CONF" "$RCLONE_CMD" "$src" "$dst" \
+            --log-file="$LOG_FILE" \
+            $RCLONE_OPTS
+        ((COUNT++))
+    done
+done
 
 echo "$(date): --- Done ---" >> "$LOG_FILE"
-
-send_ntfy "✅ Sync on $(hostname) completed successfully." "Success" "heavy_check_mark"
+send_ntfy "✅ Sync on $(hostname) completed successfully. Total pairs: $COUNT." "Success" "heavy_check_mark"
 ```
 
 ---
@@ -108,59 +164,86 @@ send_ntfy "✅ Sync on $(hostname) completed successfully." "Success" "heavy_che
 ```powershell
 # --- НАСТРОЙКИ ---
 $ErrorActionPreference = "Stop"
-# Полный путь к программе (обязательно для Планировщика)
-# ВАЖНО: Если Планировщик работает от имени SYSTEM, $env:USERPROFILE использовать нельзя!
+
+# Программа (Путь к EXE / Путь к конфигу)
 $RcloneExe  = "C:\Users\Admin\scoop\shims\rclone.exe" 
-# Если установлен системно, укажите точный путь: "C:\Program Files\rclone\rclone.exe"
-$SourceDir  = "C:\Users\Admin\Documents"
-# Путь к настройкам rclone
 $RcloneConf = "C:\Users\Admin\scoop\apps\rclone\current\rclone.conf"
-# Куда копируем:
+
+# Источники (Варианты: Один / Массив)
+$SourceDir  = "C:\Users\Admin\Documents"
+# $SourceDir  = @("C:\Data", "D:\Projects")
+
+# Назначение (Варианты: Одно / Массив)
 $DestDir    = "gdrive:backup_mirror"
+# $DestDir    = @("gdrive:backup", "onedrive:backup")
+
+# Параметры (Варианты: sync: зеркало / copy: копирование / move: перемещение)
+$RcloneCmd  = "sync"
+# $RcloneCmd  = "copy"
+# $RcloneCmd  = "move"
+
+# Дополнительно (Варианты: Проверка контрольных сумм / Потоки)
+$RcloneOpts = @("--checksum", "--transfers", "4", "--progress")
+
+# Логирование
 $LogFile    = "C:\Logs\rclone_sync.log"
 
+
 # --- РАБОТА ---
-Add-Content $LogFile "$(Get-Date): Start"
+Add-Content $LogFile "$(Get-Date): --- Start ---"
 
-# Варианты копирования:
-# & $RcloneExe --config $RcloneConf sync "$SourceDir" "$DestDir"        # Синхронизация (удаляет лишнее в копии)
-# & $RcloneExe --config $RcloneConf copy "$SourceDir" "$DestDir"        # Копирование (не удаляет лишнее)
-# & $RcloneExe --config $RcloneConf move "$SourceDir" "$DestDir"        # Перемещение (удаляет оригинал)
+# Приведение к массивам для единообразной обработки
+$Sources = [array]$SourceDir
+$Destinations = [array]$DestDir
 
-# Запуск с полным путем:
-& $RcloneExe --config $RcloneConf sync "$SourceDir" "$DestDir" `
-    --progress `
-    --log-file "$LogFile" `
-    --checksum `
-    --transfers 4
+foreach ($src in $Sources) {
+    foreach ($dst in $Destinations) {
+        Add-Content $LogFile "$(Get-Date): Processing $src -> $dst"
+        & $RcloneExe --config $RcloneConf $RcloneCmd "$src" "$dst" `
+            --log-file "$LogFile" `
+            @RcloneOpts
+    }
+}
 
-Add-Content $LogFile "$(Get-Date): Done"
+Add-Content $LogFile "$(Get-Date): --- Done ---"
 ```
 
 ### Скрипт с уведомлениями Ntfy (`rclone_sync_ntfy.ps1`)
 
-Полная версия скрипта, отправляющая статус работы на телефон или компьютер. Инструкция по настройке: **[Оповещения через Ntfy.sh](07-monitoring-ntfy.md)**.
-
 ```powershell
+# --- НАСТРОЙКИ ---
 $ErrorActionPreference = "Stop"
 
-# --- НАСТРОЙКИ ---
+# Оповещения (Вариант: Тема ntfy.sh)
 $NtfyTopic = "ваше_имя_темы"
 
-# ВАЖНО: Если Планировщик работает от имени SYSTEM, $env:USERPROFILE использовать нельзя!
+# Программа (Путь к EXE / Путь к конфигу)
 $RcloneExe  = "C:\Users\Admin\scoop\shims\rclone.exe" 
-
-$SourceDir  = "C:\Users\Admin\Documents"
 $RcloneConf = "C:\Users\Admin\scoop\apps\rclone\current\rclone.conf"
+
+# Источники (Варианты: Один / Массив)
+$SourceDir  = "C:\Users\Admin\Documents"
+# $SourceDir  = @("C:\Data", "D:\Projects")
+
+# Назначение (Варианты: Одно / Массив)
 $DestDir    = "gdrive:backup_mirror"
+# $DestDir    = @("gdrive:backup", "onedrive:backup")
+
+# Параметры (Варианты: sync / copy)
+$RcloneCmd  = "sync"
+
+# Дополнительно (Варианты: Проверка контрольных сумм / Потоки)
+$RcloneOpts = @("--checksum", "--transfers", "4")
+
+# Логирование
 $LogFile    = "C:\Logs\rclone_sync.log"
+
 
 # --- ФУНКЦИЯ УВЕДОМЛЕНИЙ ---
 function Send-Ntfy ($Message, $Title = "Notification", $Tags = "") {
     $Topic = "$NtfyTopic".Trim().Trim("/")
     if (-not $Topic) { return }
 
-    # Формируем URL с параметрами (обход проблемы с кодировкой заголовков в PowerShell)
     $Url = "https://ntfy.sh/$Topic"
     $Params = @()
     if ($Title) { $Params += "title=$([Uri]::EscapeDataString($Title))" }
@@ -176,26 +259,34 @@ function Send-Ntfy ($Message, $Title = "Notification", $Tags = "") {
     }
 }
 
-# --- РАБОТА (С МОНИТОРИНГОМ) ---
+# --- РАБОТА ---
+$CurrentPair = "Initialization"
 try {
-    Add-Content $LogFile "$(Get-Date): Start"
+    Add-Content $LogFile "$(Get-Date): --- Start ---"
 
-    # Запуск rclone через оператор & с полным путем
-    & $RcloneExe --config $RcloneConf sync "$SourceDir" "$DestDir" `
-        --log-file "$LogFile" `
-        --checksum `
-        --transfers 4
+    $Sources = [array]$SourceDir
+    $Destinations = [array]$DestDir
+    $Count = 0
 
-    # Проверка: если rclone вернул не 0, значит случилась ошибка
-    if ($LASTEXITCODE -ne 0) {
-        throw "Rclone failed with exit code $LASTEXITCODE. Check log: $LogFile"
+    foreach ($src in $Sources) {
+        foreach ($dst in $Destinations) {
+            $CurrentPair = "$src -> $dst"
+            & $RcloneExe --config $RcloneConf $RcloneCmd "$src" "$dst" `
+                --log-file "$LogFile" `
+                @RcloneOpts
+            
+            if ($LASTEXITCODE -ne 0) {
+                throw "Rclone failed with exit code $LASTEXITCODE."
+            }
+            $Count++
+        }
     }
 
-    Add-Content $LogFile "$(Get-Date): Done"
-    Send-Ntfy "✅ Sync on $($env:COMPUTERNAME) completed successfully." "Success" "heavy_check_mark"
+    Add-Content $LogFile "$(Get-Date): --- Done ---"
+    Send-Ntfy "✅ Sync on $($env:COMPUTERNAME) completed successfully. Total pairs: $Count." "Success" "heavy_check_mark"
 }
 catch {
-    Send-Ntfy "❌ Error on $($env:COMPUTERNAME): $($_.Exception.Message)" "Backup Failed" "warning,skull"
+    Send-Ntfy "❌ Error: $CurrentPair failed. $($_.Exception.Message)" "Sync Failed" "warning,skull"
     throw
 }
 ```
@@ -204,14 +295,5 @@ catch {
 
 ## 4. Автозапуск
 
-Как настроить запуск по расписанию:
+Настройка запуска по расписанию:
 **[Автоматизация бэкапов](00-automation.md)**
-
----
-
-## 5. Особенности работы
-
-* Создает точную копию данных. Старые версии файлов не хранятся.
-* Файлы в облаке лежат в обычном виде, их можно открыть без специальных программ.
-* Синхронизация не следит за файлами постоянно. Её нужно запускать самому или через планировщик.
-* **Удобство:** Можно легко поменять Google Drive на другой диск, просто изменив одну строчку в настройках скрипта.

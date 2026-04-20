@@ -1,15 +1,17 @@
-# Работа с Restic: бэкап на диск и SFTP
+# Универсальный бэкап: Локально, SFTP, Облако и Гибридная схема
 
-Как делать бэкапы на флешки, внешние диски или свои серверы напрямую.
+Описание процессов создания резервных копий в любые типы хранилищ и настройки автоматического копирования между ними. Настройка скриптов под конкретные задачи выполняется посредством комментирования или раскомментирования строк в блоке параметров.
 
 ---
 
 ## 1. Подготовка
 
-Перед запуском скриптов требуется выполнение следующих предварительных условий:
+Перед запуском скриптов учитываются следующие условия:
 
-*   **Установка программ:** Установка Restic (см. [Установку](../README.md#1-установка)).
-*   **Инициализация хранилища:** Создание репозитория Restic командой `restic init` перед первым использованием (указана в комментариях к скрипту).
+*   **Установка программ:** Наличие установленных Restic и Rclone (см. [Установку](../README.md#1-установка)).
+*   **Настройка облака:** **Если** используются облачные хранилища, требуется наличие созданного подключения в Rclone (см. [Настройку облака](00-rclone-config.md)).
+*   **Инициализация:** Выполнение команды `restic init` для основного репозитория. **Если** используется гибридная схема (копирование), инициализация также требуется для дополнительного репозитория.
+*   **Права доступа:** **Если** в Windows используется параметр VSS (`--use-fs-snapshot`), запуск скрипта выполняется от имени администратора.
 
 ---
 
@@ -20,72 +22,111 @@
 ```bash
 #!/bin/bash
 set -euo pipefail
+
 # --- НАСТРОЙКИ ---
-# Где лежит хранилище
+
+# Хранилище (Варианты: Локально / SFTP / Облако)
 export RESTIC_REPOSITORY="/mnt/usb_drive/backup"
-# Если используете SFTP:
 # export RESTIC_REPOSITORY="sftp:user@host:/path/to/repo"
-# Если используете облако (Google Drive) через Rclone:
 # export RESTIC_REPOSITORY="rclone:gdrive:backup_repo"
 
-export RESTIC_PASSWORD="ваш_пароль"
-# Можно хранить пароль в файле:
-# export RESTIC_PASSWORD_FILE="/path/to/password.txt"
+# Второе хранилище (Опционально: Пусто / Облако / Другой диск)
+# При заполнении выполняется команда restic copy
+SECONDARY_REPOSITORY=""
+# SECONDARY_REPOSITORY="rclone:gdrive:backup_cloud"
 
+# Безопасность (Варианты: Пароль / Файл с паролем / Второй пароль)
+export RESTIC_PASSWORD="ваш_пароль"
+# export RESTIC_PASSWORD_FILE="/path/to/password.txt"
+# export RESTIC_PASSWORD2="пароль_от_второго_хранилища"
+
+# Источники (Варианты: Одна папка / Массив папок)
 SOURCE_DIR="/home/user/data"
+# SOURCE_DIR=("/home/user/data" "/var/www/html")
+
+# Параметры бэкапа (Варианты: Нет / Пропуск кэша / Одна файловая система)
+RESTIC_OPTIONS=""
+# RESTIC_OPTIONS="--exclude-caches"
+# RESTIC_OPTIONS="--one-file-system"
+
+# Логирование
 LOG_FILE="/var/log/restic_backup.log"
 
-# ВАЖНО: Перед первым бэкапом создайте хранилище (один раз):
+
+# ВАЖНО: Создание хранилища перед первым бэкапом (выполняется один раз):
 # restic init
+# restic -r "$SECONDARY_REPOSITORY" init
 
 # --- РАБОТА ---
-echo "$(date): Start" >> "$LOG_FILE"
+echo "$(date): --- Start Backup ---" >> "$LOG_FILE"
 
-# Переходим в папку с данными, чтобы пути в бэкапе были короткими
-PARENT_DIR=$(dirname "$SOURCE_DIR")
-TARGET_DIR=$(basename "$SOURCE_DIR")
-cd "$PARENT_DIR" || exit
+# 1. Выполнение бэкапа в основное хранилище
+if [[ "$(declare -p SOURCE_DIR)" =~ "declare -a" ]]; then
+    restic backup "${SOURCE_DIR[@]}" $RESTIC_OPTIONS --tag "local" >> "$LOG_FILE" 2>&1
+else
+    PARENT_DIR=$(dirname "$SOURCE_DIR")
+    TARGET_DIR=$(basename "$SOURCE_DIR")
+    cd "$PARENT_DIR" || exit
+    restic backup "$TARGET_DIR" $RESTIC_OPTIONS --tag "local" >> "$LOG_FILE" 2>&1
+fi
 
-# Варианты запуска:
-# restic backup "$TARGET_DIR"                                     # Обычный бэкап
-# restic backup "$TARGET_DIR" --exclude "*.tmp"                   # Бэкап без временных файлов
-# restic backup "$TARGET_DIR" --tag "local"                       # Бэкап с меткой (удобно для поиска)
+# 2. Копирование в дополнительное хранилище (при наличии настроек)
+if [ -n "$SECONDARY_REPOSITORY" ]; then
+    echo "$(date): --- Start Copy to Secondary ---" >> "$LOG_FILE"
+    restic copy --to-repo "$SECONDARY_REPOSITORY" >> "$LOG_FILE" 2>&1
+fi
 
-# Делаем бэкап
-restic backup "$TARGET_DIR" --tag "local" >> "$LOG_FILE" 2>&1
-
-# Варианты очистки старых копий:
-# restic forget --keep-last 10 --prune                            # Оставить только 10 последних
-# restic forget --keep-daily 7 --keep-weekly 4 --keep-monthly 12 --prune # Хранить 7 дней, 4 недели, 12 месяцев
-
-# Удаляем старые копии
+# 3. Очистка старых копий (в основном хранилище)
 restic forget --keep-daily 7 --keep-weekly 4 --keep-monthly 12 --prune >> "$LOG_FILE" 2>&1
 
-# Проверка данных на ошибки
+# 4. Проверка на ошибки
 restic check >> "$LOG_FILE" 2>&1
 
-echo "$(date): Done" >> "$LOG_FILE"
+echo "$(date): --- Done ---" >> "$LOG_FILE"
 ```
 
 ### Скрипт с уведомлениями Ntfy (`backup_ntfy.sh`)
-
-Полная версия скрипта, отправляющая статус работы на телефон или компьютер. Инструкция по настройке: **[Оповещения через Ntfy.sh](07-monitoring-ntfy.md)**.
 
 ```bash
 #!/bin/bash
 set -euo pipefail
 
 # --- НАСТРОЙКИ ---
+
+# Оповещения (Вариант: Тема ntfy.sh)
 NTFY_TOPIC="имя_темы"
 
-# Где лежит хранилище
+# Хранилище (Варианты: Локально / SFTP / Облако)
 export RESTIC_REPOSITORY="/mnt/usb_drive/backup"
-# Если используете облако (Google Drive) через Rclone:
+# export RESTIC_REPOSITORY="sftp:user@host:/path/to/repo"
 # export RESTIC_REPOSITORY="rclone:gdrive:backup_repo"
 
+# Второе хранилище (Опционально: Пусто / Облако / Другой диск)
+# При заполнении выполняется команда restic copy
+SECONDARY_REPOSITORY=""
+# SECONDARY_REPOSITORY="rclone:gdrive:backup_cloud"
+
+# Безопасность (Варианты: Пароль / Файл с паролем / Второй пароль)
 export RESTIC_PASSWORD="ваш_пароль"
+# export RESTIC_PASSWORD_FILE="/path/to/password.txt"
+# export RESTIC_PASSWORD2="пароль_от_второго_хранилища"
+
+# Источники (Варианты: Одна папка / Массив папок)
 SOURCE_DIR="/home/user/data"
+# SOURCE_DIR=("/home/user/data" "/var/www/html")
+
+# Параметры бэкапа (Варианты: Нет / Пропуск кэша / Одна файловая система)
+RESTIC_OPTIONS=""
+# RESTIC_OPTIONS="--exclude-caches"
+# RESTIC_OPTIONS="--one-file-system"
+
+# Логирование
 LOG_FILE="/var/log/restic_backup.log"
+
+
+# ВАЖНО: Создание хранилища перед первым бэкапом (выполняется один раз):
+# restic init
+# restic -r "$SECONDARY_REPOSITORY" init
 
 # --- ФУНКЦИЯ УВЕДОМЛЕНИЙ ---
 send_ntfy() {
@@ -101,27 +142,39 @@ send_ntfy() {
 }
 
 # --- МОНИТОРИНГ ОШИБОК ---
-trap 'send_ntfy "❌ Backup error on $(hostname). Check log: $LOG_FILE" "Backup Failed" "warning,skull"' ERR
+CURRENT_STAGE="Initialization"
+trap 'send_ntfy "❌ Error during $CURRENT_STAGE on $(hostname). Check log: $LOG_FILE" "Backup Failed" "warning,skull"' ERR
 
 # --- РАБОТА ---
-echo "$(date): Start" >> "$LOG_FILE"
+echo "$(date): --- Start ---" >> "$LOG_FILE"
 
-PARENT_DIR=$(dirname "$SOURCE_DIR")
-TARGET_DIR=$(basename "$SOURCE_DIR")
-cd "$PARENT_DIR" || exit
+# 1. Бэкап
+CURRENT_STAGE="Backup"
+if [[ "$(declare -p SOURCE_DIR)" =~ "declare -a" ]]; then
+    restic backup "${SOURCE_DIR[@]}" $RESTIC_OPTIONS --tag "local" >> "$LOG_FILE" 2>&1
+else
+    PARENT_DIR=$(dirname "$SOURCE_DIR")
+    TARGET_DIR=$(basename "$SOURCE_DIR")
+    cd "$PARENT_DIR" || exit
+    restic backup "$TARGET_DIR" $RESTIC_OPTIONS --tag "local" >> "$LOG_FILE" 2>&1
+fi
 
-# Бэкап
-restic backup "$TARGET_DIR" --tag "local" >> "$LOG_FILE" 2>&1
+# 2. Копирование (при наличии настроек)
+COPY_STATUS=""
+if [ -n "$SECONDARY_REPOSITORY" ]; then
+    CURRENT_STAGE="Copy to Secondary"
+    echo "$(date): --- Copying to Secondary ---" >> "$LOG_FILE"
+    restic copy --to-repo "$SECONDARY_REPOSITORY" >> "$LOG_FILE" 2>&1
+    COPY_STATUS=" and Copy"
+fi
 
-# Очистка
+# 3. Обслуживание
+CURRENT_STAGE="Maintenance (Forget/Check)"
 restic forget --keep-daily 7 --keep-weekly 4 --keep-monthly 12 --prune >> "$LOG_FILE" 2>&1
-
-# Проверка
 restic check >> "$LOG_FILE" 2>&1
 
-echo "$(date): Done" >> "$LOG_FILE"
-
-send_ntfy "✅ Backup on $(hostname) completed successfully." "Success" "heavy_check_mark"
+echo "$(date): --- Done ---" >> "$LOG_FILE"
+send_ntfy "✅ Backup$COPY_STATUS on $(hostname) completed successfully." "Success" "heavy_check_mark"
 ```
 
 ---
@@ -133,94 +186,125 @@ send_ntfy "✅ Backup on $(hostname) completed successfully." "Success" "heavy_c
 ```powershell
 # --- НАСТРОЙКИ ---
 $ErrorActionPreference = "Stop"
-
-# Полный путь к программе (обязательно для Планировщика)
-# ВАЖНО: Если Планировщик работает от имени SYSTEM, $env:USERPROFILE использовать нельзя!
-# Укажите жесткий путь к программе:
 $ResticExe = "C:\Users\Admin\scoop\shims\restic.exe"
-# Если установлен системно: "C:\Program Files\restic\restic.exe"
 
-# Где лежит хранилище
+# Хранилище (Варианты: Локально / Облако / SFTP)
 $env:RESTIC_REPOSITORY = "D:\Backup\repo"
-# Если используете SFTP:
-# $env:RESTIC_REPOSITORY = "sftp:user@host:/path/to/repo"
-# Если используете облако (Google Drive) через Rclone:
 # $env:RESTIC_REPOSITORY = "rclone:gdrive:backup_repo"
-# ВАЖНО: Чтобы Планировщик (SYSTEM) нашел Rclone из Scoop, добавьте пути:
+# $env:RESTIC_REPOSITORY = "sftp:user@host:/path/to/repo"
+
+# Второе хранилище (Опционально: Пусто / Облако)
+# При заполнении выполняется команда restic copy
+$SecondaryRepo = ""
+# $SecondaryRepo = "rclone:gdrive:backup_cloud"
+
+# Системные пути (Варианты: Пути / Конфиг Rclone)
 # $env:PATH += ";C:\Users\Admin\scoop\shims"
 # $env:RCLONE_CONFIG = "C:\Users\Admin\scoop\apps\rclone\current\rclone.conf"
 
-$env:RESTIC_PASSWORD   = "ваш_пароль"
-# Можно хранить пароль в файле:
+# Безопасность (Варианты: Пароль / Файл с паролем / Второй пароль)
+$env:RESTIC_PASSWORD = "ваш_пароль"
 # $env:RESTIC_PASSWORD_FILE = "C:\path\to\password.txt"
+# $env:RESTIC_PASSWORD2 = "пароль_от_второго_хранилища"
 
-$SourceDir             = "C:\Users\Admin\Documents"
-$LogFile               = "C:\Logs\backup.log"
+# Источники (Варианты: Одна папка / Список папок)
+$SourceDir = "C:\Users\Admin\Documents"
+# $SourceDir = @("C:\Data", "D:\Projects")
 
-# ВАЖНО: Перед первым бэкапом создайте хранилище (один раз):
+# Параметры бэкапа (Варианты: Нет / VSS снимок / Пропуск кэша)
+$ResticOptions = ""
+# $ResticOptions = "--use-fs-snapshot"
+# $ResticOptions = "--exclude-caches"
+
+# Логирование
+$LogFile = "C:\Logs\backup.log"
+
+
+# ВАЖНО: Создание хранилища перед первым бэкапом (выполняется один раз):
 # & $ResticExe init
+# & $ResticExe -r $SecondaryRepo init
 
 # --- РАБОТА ---
-Add-Content $LogFile "$(Get-Date): Start"
+Add-Content $LogFile "$(Get-Date): --- Start Backup ---"
 
-# Переходим в папку с данными, чтобы пути в бэкапе были короткими
-$ParentDir = Split-Path -Path $SourceDir -Parent
-$TargetDir = Split-Path -Path $SourceDir -Leaf
-Set-Location -Path $ParentDir
+# Подготовка путей
+if ($SourceDir -is [array]) {
+    $Targets = $SourceDir
+} else {
+    $ParentDir = Split-Path -Path $SourceDir -Parent
+    $TargetDir = Split-Path -Path $SourceDir -Leaf
+    Set-Location -Path $ParentDir
+    $Targets = $TargetDir
+}
 
-# Временно отключаем остановку на stderr от native-утилит (restic пишет статусы в stderr)
+# Временно отключаем остановку на stderr
 $ErrorActionPreference = "Continue"
 
-# Варианты запуска:
-# & $ResticExe backup "$TargetDir" 2>&1 | Out-File -FilePath "$LogFile" -Append
-# & $ResticExe backup "$TargetDir" --exclude "*.tmp" 2>&1 | Out-File -FilePath "$LogFile" -Append
-# & $ResticExe backup "$TargetDir" --tag "local" 2>&1 | Out-File -FilePath "$LogFile" -Append
+# 1. Выполнение бэкапа
+& $ResticExe backup $Targets $ResticOptions --tag "local" 2>&1 | Out-File -FilePath "$LogFile" -Append
+if ($LASTEXITCODE -ne 0) { throw "Backup failed" }
 
-# Делаем бэкап
-& $ResticExe backup "$TargetDir" --tag "local" 2>&1 | Out-File -FilePath "$LogFile" -Append
-if ($LASTEXITCODE -ne 0) { Write-Warning "Restic backup error (code: $LASTEXITCODE)" }
+# 2. Копирование (при наличии настроек)
+if ($SecondaryRepo) {
+    Add-Content $LogFile "$(Get-Date): --- Start Copy to Secondary ---"
+    & $ResticExe copy --to-repo $SecondaryRepo 2>&1 | Out-File -FilePath "$LogFile" -Append
+}
 
-# Варианты очистки старых копий:
-# & $ResticExe forget --keep-last 10 --prune 2>&1 | Out-File -FilePath "$LogFile" -Append
-# & $ResticExe forget --keep-daily 7 --keep-weekly 4 --keep-monthly 12 --prune 2>&1 | Out-File -FilePath "$LogFile" -Append
-
-# Удаляем старые копии
+# 3. Удаление старых копий
 & $ResticExe forget --keep-daily 7 --keep-weekly 4 --keep-monthly 12 --prune 2>&1 | Out-File -FilePath "$LogFile" -Append
-if ($LASTEXITCODE -ne 0) { Write-Warning "Restic forget error (code: $LASTEXITCODE)" }
 
-# Проверка данных на ошибки
+# 4. Проверка данных
 & $ResticExe check 2>&1 | Out-File -FilePath "$LogFile" -Append
-if ($LASTEXITCODE -ne 0) { Write-Warning "Restic check error (code: $LASTEXITCODE)" }
 
 $ErrorActionPreference = "Stop"
-
-Add-Content $LogFile "$(Get-Date): Done"
+Add-Content $LogFile "$(Get-Date): --- Done ---"
 ```
 
 ### Скрипт с уведомлениями Ntfy (`backup_ntfy.ps1`)
 
-Полная версия скрипта, отправляющая статус работы на телефон или компьютер. Инструкция по настройке: **[Оповещения через Ntfy.sh](07-monitoring-ntfy.md)**.
-
 ```powershell
-$ErrorActionPreference = "Stop"
-
 # --- НАСТРОЙКИ ---
-$NtfyTopic = "ваше_имя_темы"
-
-# ВАЖНО: Если Планировщик работает от имени SYSTEM, $env:USERPROFILE использовать нельзя!
+$ErrorActionPreference = "Stop"
 $ResticExe = "C:\Users\Admin\scoop\shims\restic.exe"
 
-# Где лежит хранилище
+# Оповещения (Вариант: Тема ntfy.sh)
+$NtfyTopic = "ваше_имя_темы"
+
+# Хранилище (Варианты: Локально / Облако / SFTP)
 $env:RESTIC_REPOSITORY = "D:\Backup\repo"
-# Если используете облако (Google Drive) через Rclone:
 # $env:RESTIC_REPOSITORY = "rclone:gdrive:backup_repo"
-# ВАЖНО: Чтобы Планировщик (SYSTEM) нашел Rclone из Scoop, добавьте пути:
+# $env:RESTIC_REPOSITORY = "sftp:user@host:/path/to/repo"
+
+# Второе хранилище (Опционально: Пусто / Облако)
+# При заполнении выполняется команда restic copy
+$SecondaryRepo = ""
+# $SecondaryRepo = "rclone:gdrive:backup_cloud"
+
+# Системные пути (Варианты: Пути / Конфиг Rclone)
 # $env:PATH += ";C:\Users\Admin\scoop\shims"
 # $env:RCLONE_CONFIG = "C:\Users\Admin\scoop\apps\rclone\current\rclone.conf"
 
-$env:RESTIC_PASSWORD   = "ваш_пароль"
-$SourceDir             = "C:\Users\Admin\Documents"
-$LogFile               = "C:\Logs\backup.log"
+# Безопасность (Варианты: Пароль / Файл с паролем / Второй пароль)
+$env:RESTIC_PASSWORD = "ваш_пароль"
+# $env:RESTIC_PASSWORD_FILE = "C:\path\to\password.txt"
+# $env:RESTIC_PASSWORD2 = "пароль_от_второго_хранилища"
+
+# Источники (Варианты: Одна папка / Список папок)
+$SourceDir = "C:\Users\Admin\Documents"
+# $SourceDir = @("C:\Data", "D:\Projects")
+
+# Параметры бэкапа (Варианты: Нет / VSS снимок / Пропуск кэша)
+$ResticOptions = ""
+# $ResticOptions = "--use-fs-snapshot"
+# $ResticOptions = "--exclude-caches"
+
+# Логирование
+$LogFile = "C:\Logs\backup.log"
+
+
+# ВАЖНО: Создание хранилища перед первым бэкапом (выполняется один раз):
+# & $ResticExe init
+# & $ResticExe -r $SecondaryRepo init
 
 # --- ФУНКЦИЯ УВЕДОМЛЕНИЙ ---
 function Send-Ntfy ($Message, $Title = "Notification", $Tags = "") {
@@ -242,36 +326,48 @@ function Send-Ntfy ($Message, $Title = "Notification", $Tags = "") {
     }
 }
 
-# --- РАБОТА (С МОНИТОРИНГОМ) ---
+# --- РАБОТА ---
+$CurrentStage = "Initialization"
 try {
-    Add-Content $LogFile "$(Get-Date): Start"
+    Add-Content $LogFile "$(Get-Date): --- Start ---"
 
-    $ParentDir = Split-Path -Path $SourceDir -Parent
-    $TargetDir = Split-Path -Path $SourceDir -Leaf
-    Set-Location -Path $ParentDir
+    if ($SourceDir -is [array]) {
+        $Targets = $SourceDir
+    } else {
+        $ParentDir = Split-Path -Path $SourceDir -Parent
+        $TargetDir = Split-Path -Path $SourceDir -Leaf
+        Set-Location -Path $ParentDir
+        $Targets = $TargetDir
+    }
 
-    # Отключаем остановку при выводе restic в stderr
     $ErrorActionPreference = "Continue"
 
-    # Бэкап
-    & $ResticExe backup "$TargetDir" --tag "local" 2>&1 | Out-File -FilePath "$LogFile" -Append
-    if ($LASTEXITCODE -ne 0) { throw "Restic backup failed (code: $LASTEXITCODE)." }
+    # 1. Бэкап
+    $CurrentStage = "Backup"
+    & $ResticExe backup $Targets $ResticOptions --tag "local" 2>&1 | Out-File -FilePath "$LogFile" -Append
+    if ($LASTEXITCODE -ne 0) { throw "Backup failed." }
 
-    # Очистка
+    # 2. Копирование (при наличии настроек)
+    $CopyStatus = ""
+    if ($SecondaryRepo) {
+        $CurrentStage = "Copy to Secondary"
+        Add-Content $LogFile "$(Get-Date): --- Copying ---"
+        & $ResticExe copy --to-repo $SecondaryRepo 2>&1 | Out-File -FilePath "$LogFile" -Append
+        if ($LASTEXITCODE -ne 0) { throw "Copy to secondary repository failed." }
+        $CopyStatus = " and Copy"
+    }
+
+    # 3. Очистка и Проверка
+    $CurrentStage = "Maintenance (Forget/Check)"
     & $ResticExe forget --keep-daily 7 --keep-weekly 4 --keep-monthly 12 --prune 2>&1 | Out-File -FilePath "$LogFile" -Append
-    if ($LASTEXITCODE -ne 0) { throw "Restic forget failed (code: $LASTEXITCODE)." }
-
-    # Проверка
     & $ResticExe check 2>&1 | Out-File -FilePath "$LogFile" -Append
-    if ($LASTEXITCODE -ne 0) { throw "Restic check failed (code: $LASTEXITCODE)." }
 
     $ErrorActionPreference = "Stop"
-
-    Add-Content $LogFile "$(Get-Date): Done"
-    Send-Ntfy "✅ Backup on $($env:COMPUTERNAME) completed successfully." "Success" "heavy_check_mark"
+    Add-Content $LogFile "$(Get-Date): --- Done ---"
+    Send-Ntfy "✅ Backup$CopyStatus on $($env:COMPUTERNAME) completed successfully." "Success" "heavy_check_mark"
 }
 catch {
-    Send-Ntfy "❌ Error on $($env:COMPUTERNAME): $($_.Exception.Message). Check log: $LogFile" "Backup Failed" "warning,skull"
+    Send-Ntfy "❌ Error during $CurrentStage on $($env:COMPUTERNAME): $($_.Exception.Message). Check log: $LogFile" "Backup Failed" "warning,skull"
     throw
 }
 ```
@@ -282,11 +378,3 @@ catch {
 
 Настройка запуска по расписанию:
 **[Автоматизация бэкапов](00-automation.md)**
-
----
-
-## 5. Когда использовать
-
-* При наличии прямого доступа к диску или серверу по SFTP.
-* Высокая скорость работы за счет отсутствия программ-посредников.
-* **Важно:** Предварительный запуск `restic init` для подготовки места под бэкапы.
