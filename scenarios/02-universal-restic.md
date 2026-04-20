@@ -42,9 +42,9 @@ export RESTIC_PASSWORD="ваш_пароль"
 # export RESTIC_PASSWORD_TO="пароль_от_второго_хранилища"
 # export RESTIC_PASSWORD_FILE_TO="/path/to/password2.txt"
 
-# Источники (Варианты: Одна папка / Массив папок)
-SOURCE_DIR="/home/user/data"
-# SOURCE_DIR=("/home/user/data" "/var/www/html")
+# Источники (Варианты: Один путь / Массив путей)
+SOURCE="/home/user/data"
+# SOURCE=("/home/user/data" "/var/www/html")
 
 # Параметры бэкапа (Варианты: Нет / Пропуск кэша / Одна файловая система)
 RESTIC_OPTIONS=""
@@ -63,13 +63,15 @@ LOG_FILE="/var/log/restic_backup.log"
 echo "$(date): --- Start Backup ---" >> "$LOG_FILE"
 
 # 1. Выполнение бэкапа в основное хранилище
-if [[ "$(declare -p SOURCE_DIR)" =~ "declare -a" ]]; then
-    restic backup "${SOURCE_DIR[@]}" $RESTIC_OPTIONS --tag "local" >> "$LOG_FILE" 2>&1
+if [[ "$(declare -p SOURCE 2>/dev/null)" =~ "declare -a" ]]; then
+    # Использование полных путей для массива
+    restic backup "${SOURCE[@]}" $RESTIC_OPTIONS --tag "local" >> "$LOG_FILE" 2>&1
 else
-    PARENT_DIR=$(dirname "$SOURCE_DIR")
-    TARGET_DIR=$(basename "$SOURCE_DIR")
+    # Переход в родительский каталог для красоты имен в бэкапе
+    PARENT_DIR=$(dirname "$SOURCE")
+    TARGET_NAME=$(basename "$SOURCE")
     cd "$PARENT_DIR" || exit
-    restic backup "$TARGET_DIR" $RESTIC_OPTIONS --tag "local" >> "$LOG_FILE" 2>&1
+    restic backup "$TARGET_NAME" $RESTIC_OPTIONS --tag "local" >> "$LOG_FILE" 2>&1
 fi
 
 # 2. Копирование в дополнительное хранилище (при наличии настроек)
@@ -100,6 +102,7 @@ NTFY_TOPIC="имя_темы"
 
 # Хранилище (Варианты: Локально / SFTP / Облако)
 export RESTIC_REPOSITORY="/mnt/usb_drive/backup"
+# export RESTIC_REPOSITORY="sftp:user@host:/path/to/repo"
 # export RESTIC_REPOSITORY="rclone:gdrive:backup_repo"
 
 # Второе хранилище (Опционально: Пусто / Облако / Другой диск)
@@ -113,9 +116,9 @@ export RESTIC_PASSWORD="ваш_пароль"
 # export RESTIC_PASSWORD_TO="пароль_от_второго_хранилища"
 # export RESTIC_PASSWORD_FILE_TO="/path/to/password2.txt"
 
-# Источники (Варианты: Одна папка / Массив папок)
-SOURCE_DIR="/home/user/data"
-# SOURCE_DIR=("/home/user/data" "/var/www/html")
+# Источники (Варианты: Один путь / Массив)
+SOURCE="/home/user/data"
+# SOURCE=("/home/user/data" "/var/www/html")
 
 # Параметры бэкапа (Варианты: Нет / Пропуск кэша / Одна файловая система)
 RESTIC_OPTIONS=""
@@ -152,13 +155,13 @@ echo "$(date): --- Start ---" >> "$LOG_FILE"
 
 # 1. Бэкап
 CURRENT_STAGE="Backup"
-if [[ "$(declare -p SOURCE_DIR)" =~ "declare -a" ]]; then
-    restic backup "${SOURCE_DIR[@]}" $RESTIC_OPTIONS --tag "local" >> "$LOG_FILE" 2>&1
+if [[ "$(declare -p SOURCE 2>/dev/null)" =~ "declare -a" ]]; then
+    restic backup "${SOURCE[@]}" $RESTIC_OPTIONS --tag "local" >> "$LOG_FILE" 2>&1
 else
-    PARENT_DIR=$(dirname "$SOURCE_DIR")
-    TARGET_DIR=$(basename "$SOURCE_DIR")
+    PARENT_DIR=$(dirname "$SOURCE")
+    TARGET_NAME=$(basename "$SOURCE")
     cd "$PARENT_DIR" || exit
-    restic backup "$TARGET_DIR" $RESTIC_OPTIONS --tag "local" >> "$LOG_FILE" 2>&1
+    restic backup "$TARGET_NAME" $RESTIC_OPTIONS --tag "local" >> "$LOG_FILE" 2>&1
 fi
 
 # 2. Копирование (при наличии настроек)
@@ -210,9 +213,9 @@ $env:RESTIC_PASSWORD = "ваш_пароль"
 # $env:RESTIC_PASSWORD_TO = "пароль_от_второго_хранилища"
 # $env:RESTIC_PASSWORD_FILE_TO = "C:\path\to\password2.txt"
 
-# Источники (Варианты: Одна папка / Список папок)
-$SourceDir = "C:\Users\Admin\Documents"
-# $SourceDir = @("C:\Data", "D:\Projects")
+# Источники (Варианты: Один путь / Список путей)
+$Source = "C:\Users\Admin\Documents"
+# $Source = @("C:\Data", "D:\Projects")
 
 # Параметры бэкапа (Варианты: Нет / VSS снимок / Пропуск кэша)
 $ResticOptions = ""
@@ -231,13 +234,13 @@ $LogFile = "C:\Logs\backup.log"
 Add-Content $LogFile "$(Get-Date): --- Start Backup ---"
 
 # Подготовка путей
-if ($SourceDir -is [array]) {
-    $Targets = $SourceDir
+if ($Source -is [array]) {
+    $Targets = $Source
 } else {
-    $ParentDir = Split-Path -Path $SourceDir -Parent
-    $TargetDir = Split-Path -Path $SourceDir -Leaf
+    $ParentDir = Split-Path -Path $Source -Parent
+    $TargetName = Split-Path -Path $Source -Leaf
     Set-Location -Path $ParentDir
-    $Targets = $TargetDir
+    $Targets = $TargetName
 }
 
 # Временно отключаем остановку на stderr
@@ -293,9 +296,9 @@ $env:RESTIC_PASSWORD = "ваш_пароль"
 # $env:RESTIC_PASSWORD_TO = "пароль_от_второго_хранилища"
 # $env:RESTIC_PASSWORD_FILE_TO = "C:\path\to\password2.txt"
 
-# Источники (Варианты: Одна папка / Список папок)
-$SourceDir = "C:\Users\Admin\Documents"
-# $SourceDir = @("C:\Data", "D:\Projects")
+# Источники (Варианты: Один путь / Список путей)
+$Source = "C:\Users\Admin\Documents"
+# $Source = @("C:\Data", "D:\Projects")
 
 # Параметры бэкапа (Варианты: Нет / VSS снимок / Пропуск кэша)
 $ResticOptions = ""
@@ -335,13 +338,13 @@ $CurrentStage = "Initialization"
 try {
     Add-Content $LogFile "$(Get-Date): --- Start ---"
 
-    if ($SourceDir -is [array]) {
-        $Targets = $SourceDir
+    if ($Source -is [array]) {
+        $Targets = $Source
     } else {
-        $ParentDir = Split-Path -Path $SourceDir -Parent
-        $TargetDir = Split-Path -Path $SourceDir -Leaf
+        $ParentDir = Split-Path -Path $Source -Parent
+        $TargetName = Split-Path -Path $Source -Leaf
         Set-Location -Path $ParentDir
-        $Targets = $TargetDir
+        $Targets = $TargetName
     }
 
     $ErrorActionPreference = "Continue"

@@ -27,7 +27,7 @@ set -euo pipefail
 # Конфигурация (Путь к конфигу: узнать через rclone config file)
 RCLONE_CONF="/home/user/.config/rclone/rclone.conf"
 
-# Источники (Варианты: Один / Массив папок)
+# Источники (Варианты: Один путь / Массив путей)
 SOURCE="/home/user/documents"
 # SOURCE=("/home/user/data" "/var/www/html")
 
@@ -40,7 +40,7 @@ RCLONE_CMD="sync"
 # RCLONE_CMD="copy"
 # RCLONE_CMD="move"
 
-# Дополнительно (Варианты: Проверка контрольных сумм / Потоки / Прогресс)
+# Дополнительно (Варианты: Проверка контрольных сумм / Потоки)
 RCLONE_OPTS="--checksum --transfers 4 --progress"
 
 # Логирование
@@ -90,7 +90,7 @@ NTFY_TOPIC="имя_темы"
 # Конфигурация (Путь к конфигу: узнать через rclone config file)
 RCLONE_CONF="/home/user/.config/rclone/rclone.conf"
 
-# Источники (Варианты: Один / Массив)
+# Источники (Варианты: Один путь / Массив)
 SOURCE="/home/user/documents"
 # SOURCE=("/home/user/data" "/var/www/html")
 
@@ -103,7 +103,7 @@ RCLONE_CMD="sync"
 # RCLONE_CMD="copy"
 # RCLONE_CMD="move"
 
-# Дополнительно (Варианты: Проверка контрольных сумм / Потоки / Прогресс)
+# Дополнительно (Варианты: Проверка контрольных сумм / Потоки)
 RCLONE_OPTS="--checksum --transfers 4 --progress"
 
 # Логирование
@@ -172,13 +172,13 @@ $ErrorActionPreference = "Stop"
 $RcloneExe  = "C:\Users\Admin\scoop\shims\rclone.exe" 
 $RcloneConf = "C:\Users\Admin\scoop\apps\rclone\current\rclone.conf"
 
-# Источники (Варианты: Один / Массив)
-$SourceDir  = "C:\Users\Admin\Documents"
-# $SourceDir  = @("C:\Data", "D:\Projects")
+# Источники (Варианты: Один путь / Массив)
+$Source  = "C:\Users\Admin\Documents"
+# $Source  = @("C:\Data", "D:\Projects")
 
 # Назначение (Варианты: Одно / Массив)
-$DestDir    = "gdrive:backup_mirror"
-# $DestDir    = @("gdrive:backup", "onedrive:backup")
+$Destination = "gdrive:backup_mirror"
+# $Destination = @("gdrive:backup", "onedrive:backup")
 
 # Параметры (Варианты: sync: зеркало / copy: копирование / move: перемещение)
 $RcloneCmd  = "sync"
@@ -196,8 +196,8 @@ $LogFile    = "C:\Logs\rclone_sync.log"
 Add-Content $LogFile "$(Get-Date): --- Start ---"
 
 # Приведение к массивам для единообразной обработки
-$Sources = [array]$SourceDir
-$Destinations = [array]$DestDir
+$Sources = [array]$Source
+$Destinations = [array]$Destination
 
 foreach ($src in $Sources) {
     foreach ($dst in $Destinations) {
@@ -224,16 +224,18 @@ $NtfyTopic = "ваше_имя_темы"
 $RcloneExe  = "C:\Users\Admin\scoop\shims\rclone.exe" 
 $RcloneConf = "C:\Users\Admin\scoop\apps\rclone\current\rclone.conf"
 
-# Источники (Варианты: Один / Массив)
-$SourceDir  = "C:\Users\Admin\Documents"
-# $SourceDir  = @("C:\Data", "D:\Projects")
+# Источники (Варианты: Один путь / Массив)
+$Source  = "C:\Users\Admin\Documents"
+# $Source  = @("C:\Data", "D:\Projects")
 
 # Назначение (Варианты: Одно / Массив)
-$DestDir    = "gdrive:backup_mirror"
-# $DestDir    = @("gdrive:backup", "onedrive:backup")
+$Destination = "gdrive:backup_mirror"
+# $Destination = @("gdrive:backup", "onedrive:backup")
 
-# Параметры (Варианты: sync / copy)
+# Параметры (Варианты: sync: зеркало / copy: копирование / move: перемещение)
 $RcloneCmd  = "sync"
+# $RcloneCmd  = "copy"
+# $RcloneCmd  = "move"
 
 # Дополнительно (Варианты: Проверка контрольных сумм / Потоки)
 $RcloneOpts = @("--checksum", "--transfers", "4", "--progress")
@@ -267,8 +269,8 @@ $CurrentPair = "Initialization"
 try {
     Add-Content $LogFile "$(Get-Date): --- Start ---"
 
-    $Sources = [array]$SourceDir
-    $Destinations = [array]$DestDir
+    $Sources = [array]$Source
+    $Destinations = [array]$Destination
     $Count = 0
 
     foreach ($src in $Sources) {
