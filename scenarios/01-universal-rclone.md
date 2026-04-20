@@ -40,7 +40,7 @@ RCLONE_CMD="sync"
 # RCLONE_CMD="copy"
 # RCLONE_CMD="move"
 
-# Дополнительно (Варианты: Проверка контрольных сумм / Потоки)
+# Дополнительно (Варианты: Проверка контрольных сумм / Потоки / Прогресс)
 RCLONE_OPTS="--checksum --transfers 4 --progress"
 
 # Логирование
@@ -98,11 +98,13 @@ SOURCE="/home/user/documents"
 DEST="gdrive:backup_mirror"
 # DEST=("gdrive:backup" "onedrive:backup")
 
-# Параметры (Варианты: sync / copy)
+# Параметры (Варианты: sync: зеркало / copy: копирование / move: перемещение)
 RCLONE_CMD="sync"
+# RCLONE_CMD="copy"
+# RCLONE_CMD="move"
 
-# Дополнительно (Варианты: Проверка контрольных сумм / Потоки)
-RCLONE_OPTS="--checksum --transfers 4"
+# Дополнительно (Варианты: Проверка контрольных сумм / Потоки / Прогресс)
+RCLONE_OPTS="--checksum --transfers 4 --progress"
 
 # Логирование
 LOG_FILE="/var/log/rclone_sync.log"
@@ -143,6 +145,7 @@ fi
 COUNT=0
 for src in "${SOURCES_ARR[@]}"; do
     for dst in "${DESTS_ARR[@]}"; do
+        echo "$(date): Processing $src -> $dst" >> "$LOG_FILE"
         CURRENT_PAIR="$src -> $dst"
         rclone --config "$RCLONE_CONF" "$RCLONE_CMD" "$src" "$dst" \
             --log-file="$LOG_FILE" \
@@ -233,7 +236,7 @@ $DestDir    = "gdrive:backup_mirror"
 $RcloneCmd  = "sync"
 
 # Дополнительно (Варианты: Проверка контрольных сумм / Потоки)
-$RcloneOpts = @("--checksum", "--transfers", "4")
+$RcloneOpts = @("--checksum", "--transfers", "4", "--progress")
 
 # Логирование
 $LogFile    = "C:\Logs\rclone_sync.log"
@@ -270,13 +273,14 @@ try {
 
     foreach ($src in $Sources) {
         foreach ($dst in $Destinations) {
+            Add-Content $LogFile "$(Get-Date): Processing $src -> $dst"
             $CurrentPair = "$src -> $dst"
             & $RcloneExe --config $RcloneConf $RcloneCmd "$src" "$dst" `
                 --log-file "$LogFile" `
                 @RcloneOpts
             
             if ($LASTEXITCODE -ne 0) {
-                throw "Rclone failed with exit code $LASTEXITCODE."
+                throw "Rclone failed for $src -> $dst with exit code $LASTEXITCODE."
             }
             $Count++
         }
