@@ -36,10 +36,11 @@ export RESTIC_REPOSITORY="/mnt/usb_drive/backup"
 SECONDARY_REPOSITORY=""
 # SECONDARY_REPOSITORY="rclone:gdrive:backup_cloud"
 
-# Безопасность (Варианты: Пароль / Файл с паролем / Второй пароль)
+# Безопасность (Варианты: Пароль / Файл / Второй пароль / Второй файл)
 export RESTIC_PASSWORD="ваш_пароль"
 # export RESTIC_PASSWORD_FILE="/path/to/password.txt"
-# export RESTIC_PASSWORD2="пароль_от_второго_хранилища"
+# export RESTIC_PASSWORD_TO="пароль_от_второго_хранилища"
+# export RESTIC_PASSWORD_FILE_TO="/path/to/password2.txt"
 
 # Источники (Варианты: Одна папка / Массив папок)
 SOURCE_DIR="/home/user/data"
@@ -99,7 +100,6 @@ NTFY_TOPIC="имя_темы"
 
 # Хранилище (Варианты: Локально / SFTP / Облако)
 export RESTIC_REPOSITORY="/mnt/usb_drive/backup"
-# export RESTIC_REPOSITORY="sftp:user@host:/path/to/repo"
 # export RESTIC_REPOSITORY="rclone:gdrive:backup_repo"
 
 # Второе хранилище (Опционально: Пусто / Облако / Другой диск)
@@ -107,10 +107,11 @@ export RESTIC_REPOSITORY="/mnt/usb_drive/backup"
 SECONDARY_REPOSITORY=""
 # SECONDARY_REPOSITORY="rclone:gdrive:backup_cloud"
 
-# Безопасность (Варианты: Пароль / Файл с паролем / Второй пароль)
+# Безопасность (Варианты: Пароль / Файл / Второй пароль / Второй файл)
 export RESTIC_PASSWORD="ваш_пароль"
 # export RESTIC_PASSWORD_FILE="/path/to/password.txt"
-# export RESTIC_PASSWORD2="пароль_от_второго_хранилища"
+# export RESTIC_PASSWORD_TO="пароль_от_второго_хранилища"
+# export RESTIC_PASSWORD_FILE_TO="/path/to/password2.txt"
 
 # Источники (Варианты: Одна папка / Массив папок)
 SOURCE_DIR="/home/user/data"
@@ -203,10 +204,11 @@ $SecondaryRepo = ""
 # $env:PATH += ";C:\Users\Admin\scoop\shims"
 # $env:RCLONE_CONFIG = "C:\Users\Admin\scoop\apps\rclone\current\rclone.conf"
 
-# Безопасность (Варианты: Пароль / Файл с паролем / Второй пароль)
+# Безопасность (Варианты: Пароль / Файл / Второй пароль / Второй файл)
 $env:RESTIC_PASSWORD = "ваш_пароль"
 # $env:RESTIC_PASSWORD_FILE = "C:\path\to\password.txt"
-# $env:RESTIC_PASSWORD2 = "пароль_от_второго_хранилища"
+# $env:RESTIC_PASSWORD_TO = "пароль_от_второго_хранилища"
+# $env:RESTIC_PASSWORD_FILE_TO = "C:\path\to\password2.txt"
 
 # Источники (Варианты: Одна папка / Список папок)
 $SourceDir = "C:\Users\Admin\Documents"
@@ -285,10 +287,11 @@ $SecondaryRepo = ""
 # $env:PATH += ";C:\Users\Admin\scoop\shims"
 # $env:RCLONE_CONFIG = "C:\Users\Admin\scoop\apps\rclone\current\rclone.conf"
 
-# Безопасность (Варианты: Пароль / Файл с паролем / Второй пароль)
+# Безопасность (Варианты: Пароль / Файл / Второй пароль / Второй файл)
 $env:RESTIC_PASSWORD = "ваш_пароль"
 # $env:RESTIC_PASSWORD_FILE = "C:\path\to\password.txt"
-# $env:RESTIC_PASSWORD2 = "пароль_от_второго_хранилища"
+# $env:RESTIC_PASSWORD_TO = "пароль_от_второго_хранилища"
+# $env:RESTIC_PASSWORD_FILE_TO = "C:\path\to\password2.txt"
 
 # Источники (Варианты: Одна папка / Список папок)
 $SourceDir = "C:\Users\Admin\Documents"
