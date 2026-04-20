@@ -147,7 +147,7 @@ for src in "${SOURCES_ARR[@]}"; do
         rclone --config "$RCLONE_CONF" "$RCLONE_CMD" "$src" "$dst" \
             --log-file="$LOG_FILE" \
             $RCLONE_OPTS
-        ((COUNT++))
+        COUNT=$((COUNT + 1))
     done
 done
 
