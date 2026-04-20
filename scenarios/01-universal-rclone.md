@@ -10,7 +10,7 @@
 
 *   **Установка программ:** Наличие установленного Rclone (см. [Установку](../README.md#1-установка)).
 *   **Настройка облака:** **Если** планируется использование облака, требуется наличие созданного подключения в Rclone (см. [Настройку облака](00-rclone-config.md)).
-*   **Файл настроек:** Знание абсолютного пути к файлу `rclone.conf`.
+*   **Файл настроек:** Знание абсолютного пути к файлу `rclone.conf` (путь можно узнать командой `rclone config file`).
 
 ---
 
@@ -24,7 +24,7 @@ set -euo pipefail
 
 # --- НАСТРОЙКИ ---
 
-# Программа (Путь к конфигу)
+# Конфигурация (Путь к конфигу: узнать через rclone config file)
 RCLONE_CONF="/home/user/.config/rclone/rclone.conf"
 
 # Источники (Варианты: Один / Массив папок)
@@ -87,7 +87,7 @@ set -euo pipefail
 # Оповещения (Вариант: Тема ntfy.sh)
 NTFY_TOPIC="имя_темы"
 
-# Программа (Путь к конфигу)
+# Конфигурация (Путь к конфигу: узнать через rclone config file)
 RCLONE_CONF="/home/user/.config/rclone/rclone.conf"
 
 # Источники (Варианты: Один / Массив)
@@ -165,7 +165,7 @@ send_ntfy "✅ Sync on $(hostname) completed successfully. Total pairs: $COUNT."
 # --- НАСТРОЙКИ ---
 $ErrorActionPreference = "Stop"
 
-# Программа (Путь к EXE / Путь к конфигу)
+# Программа и конфиг (EXE / Путь к конфигу: узнать через rclone config file)
 $RcloneExe  = "C:\Users\Admin\scoop\shims\rclone.exe" 
 $RcloneConf = "C:\Users\Admin\scoop\apps\rclone\current\rclone.conf"
 
@@ -217,7 +217,7 @@ $ErrorActionPreference = "Stop"
 # Оповещения (Вариант: Тема ntfy.sh)
 $NtfyTopic = "ваше_имя_темы"
 
-# Программа (Путь к EXE / Путь к конфигу)
+# Программа и конфиг (EXE / Путь к конфигу: узнать через rclone config file)
 $RcloneExe  = "C:\Users\Admin\scoop\shims\rclone.exe" 
 $RcloneConf = "C:\Users\Admin\scoop\apps\rclone\current\rclone.conf"
 

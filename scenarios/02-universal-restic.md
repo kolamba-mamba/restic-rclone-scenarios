@@ -10,6 +10,7 @@
 
 *   **Установка программ:** Наличие установленных Restic и Rclone (см. [Установку](../README.md#1-установка)).
 *   **Настройка облака:** **Если** используются облачные хранилища, требуется наличие созданного подключения в Rclone (см. [Настройку облака](00-rclone-config.md)).
+*   **Файл настроек:** **Если** используется облако, требуется знание абсолютного пути к файлу `rclone.conf` (путь можно узнать командой `rclone config file`).
 *   **Инициализация:** Выполнение команды `restic init` для основного репозитория. **Если** используется гибридная схема (копирование), инициализация также требуется для дополнительного репозитория.
 *   **Права доступа:** **Если** в Windows используется параметр VSS (`--use-fs-snapshot`), запуск скрипта выполняется от имени администратора.
 
@@ -198,7 +199,7 @@ $env:RESTIC_REPOSITORY = "D:\Backup\repo"
 $SecondaryRepo = ""
 # $SecondaryRepo = "rclone:gdrive:backup_cloud"
 
-# Системные пути (Варианты: Пути / Конфиг Rclone)
+# Программа и конфиг (Пути / Конфиг Rclone: узнать через rclone config file)
 # $env:PATH += ";C:\Users\Admin\scoop\shims"
 # $env:RCLONE_CONFIG = "C:\Users\Admin\scoop\apps\rclone\current\rclone.conf"
 
@@ -280,7 +281,7 @@ $env:RESTIC_REPOSITORY = "D:\Backup\repo"
 $SecondaryRepo = ""
 # $SecondaryRepo = "rclone:gdrive:backup_cloud"
 
-# Системные пути (Варианты: Пути / Конфиг Rclone)
+# Программа и конфиг (Пути / Конфиг Rclone: узнать через rclone config file)
 # $env:PATH += ";C:\Users\Admin\scoop\shims"
 # $env:RCLONE_CONFIG = "C:\Users\Admin\scoop\apps\rclone\current\rclone.conf"
 
