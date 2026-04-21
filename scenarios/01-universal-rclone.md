@@ -11,6 +11,8 @@
 *   **Установка программ:** Наличие установленного Rclone (см. [Установку](../README.md#1-установка)).
 *   **Настройка облака:** **Если** планируется использование облака, требуется наличие созданного подключения в Rclone (см. [Настройку облака](00-rclone-config.md)).
 *   **Файл настроек:** Знание абсолютного пути к файлу `rclone.conf` (путь можно узнать командой `rclone config file`).
+*   **Журнал:** Путь из `LOG_FILE` существует и доступен для записи. Примеры путей в шаблонах показаны как образец и при необходимости заменяются.
+*   **Права:** Для режимов `sync` и `move` удаление файлов в назначении выполняется только при наличии прав записи.
 
 ---
 
@@ -41,7 +43,7 @@ RCLONE_CMD="sync"
 # RCLONE_CMD="move"
 
 # Дополнительно (Варианты: Проверка контрольных сумм / Потоки)
-RCLONE_OPTS="--checksum --transfers 4 --progress"
+RCLONE_OPTS=(--checksum --transfers 4 --progress)
 
 # Логирование
 LOG_FILE="/var/log/rclone_sync.log"
@@ -69,7 +71,7 @@ for src in "${SOURCES_ARR[@]}"; do
         echo "$(date): Processing $src -> $dst" >> "$LOG_FILE"
         rclone --config "$RCLONE_CONF" "$RCLONE_CMD" "$src" "$dst" \
             --log-file="$LOG_FILE" \
-            $RCLONE_OPTS
+            "${RCLONE_OPTS[@]}"
     done
 done
 
@@ -104,7 +106,7 @@ RCLONE_CMD="sync"
 # RCLONE_CMD="move"
 
 # Дополнительно (Варианты: Проверка контрольных сумм / Потоки)
-RCLONE_OPTS="--checksum --transfers 4 --progress"
+RCLONE_OPTS=(--checksum --transfers 4 --progress)
 
 # Логирование
 LOG_FILE="/var/log/rclone_sync.log"
@@ -149,7 +151,7 @@ for src in "${SOURCES_ARR[@]}"; do
         CURRENT_PAIR="$src -> $dst"
         rclone --config "$RCLONE_CONF" "$RCLONE_CMD" "$src" "$dst" \
             --log-file="$LOG_FILE" \
-            $RCLONE_OPTS
+            "${RCLONE_OPTS[@]}"
         COUNT=$((COUNT + 1))
     done
 done
@@ -192,6 +194,22 @@ $RcloneOpts = @("--checksum", "--transfers", "4", "--progress")
 $LogFile    = "C:\Logs\rclone_sync.log"
 
 
+# --- ФУНКЦИЯ ЗАПУСКА ---
+function Invoke-RcloneLogged {
+    param (
+        [string]$Src,
+        [string]$Dst
+    )
+
+    & $RcloneExe --config $RcloneConf $RcloneCmd "$Src" "$Dst" `
+        --log-file "$LogFile" `
+        @RcloneOpts
+
+    if ($LASTEXITCODE -ne 0) {
+        throw "Rclone failed for $Src -> $Dst with exit code $LASTEXITCODE."
+    }
+}
+
 # --- РАБОТА ---
 Add-Content $LogFile "$(Get-Date): --- Start ---"
 
@@ -202,9 +220,7 @@ $Destinations = [array]$Destination
 foreach ($src in $Sources) {
     foreach ($dst in $Destinations) {
         Add-Content $LogFile "$(Get-Date): Processing $src -> $dst"
-        & $RcloneExe --config $RcloneConf $RcloneCmd "$src" "$dst" `
-            --log-file "$LogFile" `
-            @RcloneOpts
+        Invoke-RcloneLogged -Src $src -Dst $dst
     }
 }
 
@@ -244,6 +260,22 @@ $RcloneOpts = @("--checksum", "--transfers", "4", "--progress")
 $LogFile    = "C:\Logs\rclone_sync.log"
 
 
+# --- ФУНКЦИЯ ЗАПУСКА ---
+function Invoke-RcloneLogged {
+    param (
+        [string]$Src,
+        [string]$Dst
+    )
+
+    & $RcloneExe --config $RcloneConf $RcloneCmd "$Src" "$Dst" `
+        --log-file "$LogFile" `
+        @RcloneOpts
+
+    if ($LASTEXITCODE -ne 0) {
+        throw "Rclone failed for $Src -> $Dst with exit code $LASTEXITCODE."
+    }
+}
+
 # --- ФУНКЦИЯ УВЕДОМЛЕНИЙ ---
 function Send-Ntfy ($Message, $Title = "Notification", $Tags = "") {
     $Topic = "$NtfyTopic".Trim().Trim("/")
@@ -277,13 +309,7 @@ try {
         foreach ($dst in $Destinations) {
             Add-Content $LogFile "$(Get-Date): Processing $src -> $dst"
             $CurrentPair = "$src -> $dst"
-            & $RcloneExe --config $RcloneConf $RcloneCmd "$src" "$dst" `
-                --log-file "$LogFile" `
-                @RcloneOpts
-            
-            if ($LASTEXITCODE -ne 0) {
-                throw "Rclone failed for $src -> $dst with exit code $LASTEXITCODE."
-            }
+            Invoke-RcloneLogged -Src $src -Dst $dst
             $Count++
         }
     }

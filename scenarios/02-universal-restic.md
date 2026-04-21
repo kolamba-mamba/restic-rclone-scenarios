@@ -12,6 +12,8 @@
 *   **Настройка облака:** **Если** используются облачные хранилища, требуется наличие созданного подключения в Rclone (см. [Настройку облака](00-rclone-config.md)).
 *   **Файл настроек:** **Если** используется облако, требуется знание абсолютного пути к файлу `rclone.conf` (путь можно узнать командой `rclone config file`).
 *   **Инициализация:** Выполнение команды `restic init` для основного репозитория. **Если** используется гибридная схема (копирование), инициализация также требуется для дополнительного репозитория.
+*   **Журнал:** Путь из `LOG_FILE` существует и доступен для записи. Примеры путей в шаблонах показаны как образец и при необходимости заменяются.
+*   **Пароли:** Для каждого репозитория используется свой пароль или свой файл пароля. При гибридной схеме доступ требуется и к основному, и к дополнительному хранилищу.
 *   **Права доступа:** **Если** в Windows используется параметр VSS (`--use-fs-snapshot`), запуск скрипта выполняется от имени администратора.
 
 ---
@@ -47,9 +49,9 @@ SOURCE="/home/user/data"
 # SOURCE=("/home/user/data" "/var/www/html")
 
 # Параметры бэкапа (Варианты: Нет / Пропуск кэша / Одна файловая система)
-RESTIC_OPTIONS=""
-# RESTIC_OPTIONS="--exclude-caches"
-# RESTIC_OPTIONS="--one-file-system"
+RESTIC_OPTIONS=()
+# RESTIC_OPTIONS=(--exclude-caches)
+# RESTIC_OPTIONS=(--one-file-system)
 
 # Логирование
 LOG_FILE="/var/log/restic_backup.log"
@@ -57,7 +59,7 @@ LOG_FILE="/var/log/restic_backup.log"
 
 # ВАЖНО: Создание хранилища перед первым бэкапом (выполняется один раз):
 # restic init
-# restic -r "$SECONDARY_REPOSITORY" init
+# RESTIC_PASSWORD="$RESTIC_PASSWORD_TO" restic -r "$SECONDARY_REPOSITORY" init
 
 # --- РАБОТА ---
 echo "$(date): --- Start Backup ---" >> "$LOG_FILE"
@@ -65,19 +67,47 @@ echo "$(date): --- Start Backup ---" >> "$LOG_FILE"
 # 1. Выполнение бэкапа в основное хранилище
 if [[ "$(declare -p SOURCE 2>/dev/null)" =~ "declare -a" ]]; then
     # Использование полных путей для массива
-    restic backup "${SOURCE[@]}" $RESTIC_OPTIONS --tag "local" >> "$LOG_FILE" 2>&1
+    restic backup "${SOURCE[@]}" "${RESTIC_OPTIONS[@]}" --tag "local" >> "$LOG_FILE" 2>&1
 else
     # Переход в родительский каталог для красоты имен в бэкапе
     PARENT_DIR=$(dirname "$SOURCE")
     TARGET_NAME=$(basename "$SOURCE")
     cd "$PARENT_DIR" || exit
-    restic backup "$TARGET_NAME" $RESTIC_OPTIONS --tag "local" >> "$LOG_FILE" 2>&1
+    restic backup "$TARGET_NAME" "${RESTIC_OPTIONS[@]}" --tag "local" >> "$LOG_FILE" 2>&1
 fi
 
 # 2. Копирование в дополнительное хранилище (при наличии настроек)
 if [ -n "$SECONDARY_REPOSITORY" ]; then
     echo "$(date): --- Start Copy to Secondary ---" >> "$LOG_FILE"
-    restic copy --to-repo "$SECONDARY_REPOSITORY" >> "$LOG_FILE" 2>&1
+    PRIMARY_REPOSITORY="$RESTIC_REPOSITORY"
+    PRIMARY_PASSWORD="${RESTIC_PASSWORD:-}"
+    PRIMARY_PASSWORD_FILE="${RESTIC_PASSWORD_FILE:-}"
+
+    export RESTIC_FROM_REPOSITORY="$RESTIC_REPOSITORY"
+    export RESTIC_FROM_PASSWORD="${RESTIC_PASSWORD:-}"
+    export RESTIC_FROM_PASSWORD_FILE="${RESTIC_PASSWORD_FILE:-}"
+
+    if [ -n "${RESTIC_PASSWORD_TO:-}" ]; then
+        export RESTIC_PASSWORD="$RESTIC_PASSWORD_TO"
+        unset RESTIC_PASSWORD_FILE
+    elif [ -n "${RESTIC_PASSWORD_FILE_TO:-}" ]; then
+        export RESTIC_PASSWORD_FILE="$RESTIC_PASSWORD_FILE_TO"
+        unset RESTIC_PASSWORD
+    fi
+
+    restic -r "$SECONDARY_REPOSITORY" copy --from-repo "$RESTIC_FROM_REPOSITORY" >> "$LOG_FILE" 2>&1
+
+    export RESTIC_REPOSITORY="$PRIMARY_REPOSITORY"
+    if [ -n "$PRIMARY_PASSWORD" ]; then
+        export RESTIC_PASSWORD="$PRIMARY_PASSWORD"
+    else
+        unset RESTIC_PASSWORD
+    fi
+    if [ -n "$PRIMARY_PASSWORD_FILE" ]; then
+        export RESTIC_PASSWORD_FILE="$PRIMARY_PASSWORD_FILE"
+    else
+        unset RESTIC_PASSWORD_FILE
+    fi
 fi
 
 # 3. Очистка старых копий (в основном хранилище)
@@ -121,9 +151,9 @@ SOURCE="/home/user/data"
 # SOURCE=("/home/user/data" "/var/www/html")
 
 # Параметры бэкапа (Варианты: Нет / Пропуск кэша / Одна файловая система)
-RESTIC_OPTIONS=""
-# RESTIC_OPTIONS="--exclude-caches"
-# RESTIC_OPTIONS="--one-file-system"
+RESTIC_OPTIONS=()
+# RESTIC_OPTIONS=(--exclude-caches)
+# RESTIC_OPTIONS=(--one-file-system)
 
 # Логирование
 LOG_FILE="/var/log/restic_backup.log"
@@ -131,7 +161,7 @@ LOG_FILE="/var/log/restic_backup.log"
 
 # ВАЖНО: Создание хранилища перед первым бэкапом (выполняется один раз):
 # restic init
-# restic -r "$SECONDARY_REPOSITORY" init
+# RESTIC_PASSWORD="$RESTIC_PASSWORD_TO" restic -r "$SECONDARY_REPOSITORY" init
 
 # --- ФУНКЦИЯ УВЕДОМЛЕНИЙ ---
 send_ntfy() {
@@ -156,12 +186,12 @@ echo "$(date): --- Start ---" >> "$LOG_FILE"
 # 1. Бэкап
 CURRENT_STAGE="Backup"
 if [[ "$(declare -p SOURCE 2>/dev/null)" =~ "declare -a" ]]; then
-    restic backup "${SOURCE[@]}" $RESTIC_OPTIONS --tag "local" >> "$LOG_FILE" 2>&1
+    restic backup "${SOURCE[@]}" "${RESTIC_OPTIONS[@]}" --tag "local" >> "$LOG_FILE" 2>&1
 else
     PARENT_DIR=$(dirname "$SOURCE")
     TARGET_NAME=$(basename "$SOURCE")
     cd "$PARENT_DIR" || exit
-    restic backup "$TARGET_NAME" $RESTIC_OPTIONS --tag "local" >> "$LOG_FILE" 2>&1
+    restic backup "$TARGET_NAME" "${RESTIC_OPTIONS[@]}" --tag "local" >> "$LOG_FILE" 2>&1
 fi
 
 # 2. Копирование (при наличии настроек)
@@ -169,7 +199,35 @@ COPY_STATUS=""
 if [ -n "$SECONDARY_REPOSITORY" ]; then
     CURRENT_STAGE="Copy to Secondary"
     echo "$(date): --- Copying to Secondary ---" >> "$LOG_FILE"
-    restic copy --to-repo "$SECONDARY_REPOSITORY" >> "$LOG_FILE" 2>&1
+    PRIMARY_REPOSITORY="$RESTIC_REPOSITORY"
+    PRIMARY_PASSWORD="${RESTIC_PASSWORD:-}"
+    PRIMARY_PASSWORD_FILE="${RESTIC_PASSWORD_FILE:-}"
+
+    export RESTIC_FROM_REPOSITORY="$RESTIC_REPOSITORY"
+    export RESTIC_FROM_PASSWORD="${RESTIC_PASSWORD:-}"
+    export RESTIC_FROM_PASSWORD_FILE="${RESTIC_PASSWORD_FILE:-}"
+
+    if [ -n "${RESTIC_PASSWORD_TO:-}" ]; then
+        export RESTIC_PASSWORD="$RESTIC_PASSWORD_TO"
+        unset RESTIC_PASSWORD_FILE
+    elif [ -n "${RESTIC_PASSWORD_FILE_TO:-}" ]; then
+        export RESTIC_PASSWORD_FILE="$RESTIC_PASSWORD_FILE_TO"
+        unset RESTIC_PASSWORD
+    fi
+
+    restic -r "$SECONDARY_REPOSITORY" copy --from-repo "$RESTIC_FROM_REPOSITORY" >> "$LOG_FILE" 2>&1
+
+    export RESTIC_REPOSITORY="$PRIMARY_REPOSITORY"
+    if [ -n "$PRIMARY_PASSWORD" ]; then
+        export RESTIC_PASSWORD="$PRIMARY_PASSWORD"
+    else
+        unset RESTIC_PASSWORD
+    fi
+    if [ -n "$PRIMARY_PASSWORD_FILE" ]; then
+        export RESTIC_PASSWORD_FILE="$PRIMARY_PASSWORD_FILE"
+    else
+        unset RESTIC_PASSWORD_FILE
+    fi
     COPY_STATUS=" and Copy"
 fi
 
@@ -218,16 +276,30 @@ $Source = "C:\Users\Admin\Documents"
 # $Source = @("C:\Data", "D:\Projects")
 
 # Параметры бэкапа (Варианты: Нет / VSS снимок / Пропуск кэша)
-$ResticOptions = ""
-# $ResticOptions = "--use-fs-snapshot"
-# $ResticOptions = "--exclude-caches"
+$ResticOptions = @()
+# $ResticOptions = @("--use-fs-snapshot")
+# $ResticOptions = @("--exclude-caches")
 
 # Логирование
 $LogFile = "C:\Logs\backup.log"
 
 
+# --- ФУНКЦИЯ ЗАПУСКА ---
+function Invoke-ResticLogged {
+    param (
+        [Parameter(ValueFromRemainingArguments = $true)]
+        [string[]]$Arguments
+    )
+
+    & $ResticExe @Arguments 2>&1 | Out-File -FilePath "$LogFile" -Append
+    if ($LASTEXITCODE -ne 0) {
+        throw "Restic failed: $($Arguments -join ' ')"
+    }
+}
+
 # ВАЖНО: Создание хранилища перед первым бэкапом (выполняется один раз):
 # & $ResticExe init
+# $env:RESTIC_PASSWORD = $env:RESTIC_PASSWORD_TO
 # & $ResticExe -r $SecondaryRepo init
 
 # --- РАБОТА ---
@@ -239,31 +311,69 @@ if ($Source -is [array]) {
 } else {
     $ParentDir = Split-Path -Path $Source -Parent
     $TargetName = Split-Path -Path $Source -Leaf
-    Set-Location -Path $ParentDir
+    Push-Location -Path $ParentDir
     $Targets = $TargetName
 }
 
 # Временно отключаем остановку на stderr
 $ErrorActionPreference = "Continue"
 
-# 1. Выполнение бэкапа
-& $ResticExe backup $Targets $ResticOptions --tag "local" 2>&1 | Out-File -FilePath "$LogFile" -Append
-if ($LASTEXITCODE -ne 0) { throw "Backup failed" }
+try {
+    # 1. Выполнение бэкапа
+    Invoke-ResticLogged backup $Targets $ResticOptions --tag "local"
 
-# 2. Копирование (при наличии настроек)
-if ($SecondaryRepo) {
-    Add-Content $LogFile "$(Get-Date): --- Start Copy to Secondary ---"
-    & $ResticExe copy --to-repo $SecondaryRepo 2>&1 | Out-File -FilePath "$LogFile" -Append
+    # 2. Копирование (при наличии настроек)
+    if ($SecondaryRepo) {
+        Add-Content $LogFile "$(Get-Date): --- Start Copy to Secondary ---"
+        $PrimaryRepository = $env:RESTIC_REPOSITORY
+        $PrimaryPassword = $env:RESTIC_PASSWORD
+        $PrimaryPasswordFile = $env:RESTIC_PASSWORD_FILE
+
+        $env:RESTIC_FROM_REPOSITORY = $env:RESTIC_REPOSITORY
+        $env:RESTIC_FROM_PASSWORD = $env:RESTIC_PASSWORD
+        $env:RESTIC_FROM_PASSWORD_FILE = $env:RESTIC_PASSWORD_FILE
+        $env:RESTIC_REPOSITORY = $SecondaryRepo
+
+        if ($env:RESTIC_PASSWORD_TO) {
+            $env:RESTIC_PASSWORD = $env:RESTIC_PASSWORD_TO
+            Remove-Item Env:RESTIC_PASSWORD_FILE -ErrorAction SilentlyContinue
+        }
+        elseif ($env:RESTIC_PASSWORD_FILE_TO) {
+            $env:RESTIC_PASSWORD_FILE = $env:RESTIC_PASSWORD_FILE_TO
+            Remove-Item Env:RESTIC_PASSWORD -ErrorAction SilentlyContinue
+        }
+
+        Invoke-ResticLogged copy --from-repo $env:RESTIC_FROM_REPOSITORY
+
+        $env:RESTIC_REPOSITORY = $PrimaryRepository
+        if ($PrimaryPassword) {
+            $env:RESTIC_PASSWORD = $PrimaryPassword
+        }
+        else {
+            Remove-Item Env:RESTIC_PASSWORD -ErrorAction SilentlyContinue
+        }
+        if ($PrimaryPasswordFile) {
+            $env:RESTIC_PASSWORD_FILE = $PrimaryPasswordFile
+        }
+        else {
+            Remove-Item Env:RESTIC_PASSWORD_FILE -ErrorAction SilentlyContinue
+        }
+    }
+
+    # 3. Удаление старых копий
+    Invoke-ResticLogged forget --keep-daily 7 --keep-weekly 4 --keep-monthly 12 --prune
+
+    # 4. Проверка данных
+    Invoke-ResticLogged check
+
+    Add-Content $LogFile "$(Get-Date): --- Done ---"
 }
-
-# 3. Удаление старых копий
-& $ResticExe forget --keep-daily 7 --keep-weekly 4 --keep-monthly 12 --prune 2>&1 | Out-File -FilePath "$LogFile" -Append
-
-# 4. Проверка данных
-& $ResticExe check 2>&1 | Out-File -FilePath "$LogFile" -Append
-
-$ErrorActionPreference = "Stop"
-Add-Content $LogFile "$(Get-Date): --- Done ---"
+finally {
+    $ErrorActionPreference = "Stop"
+    if (-not ($Source -is [array])) {
+        Pop-Location
+    }
+}
 ```
 
 ### Скрипт с уведомлениями Ntfy (`backup_ntfy.ps1`)
@@ -301,16 +411,30 @@ $Source = "C:\Users\Admin\Documents"
 # $Source = @("C:\Data", "D:\Projects")
 
 # Параметры бэкапа (Варианты: Нет / VSS снимок / Пропуск кэша)
-$ResticOptions = ""
-# $ResticOptions = "--use-fs-snapshot"
-# $ResticOptions = "--exclude-caches"
+$ResticOptions = @()
+# $ResticOptions = @("--use-fs-snapshot")
+# $ResticOptions = @("--exclude-caches")
 
 # Логирование
 $LogFile = "C:\Logs\backup.log"
 
 
+# --- ФУНКЦИЯ ЗАПУСКА ---
+function Invoke-ResticLogged {
+    param (
+        [Parameter(ValueFromRemainingArguments = $true)]
+        [string[]]$Arguments
+    )
+
+    & $ResticExe @Arguments 2>&1 | Out-File -FilePath "$LogFile" -Append
+    if ($LASTEXITCODE -ne 0) {
+        throw "Restic failed: $($Arguments -join ' ')"
+    }
+}
+
 # ВАЖНО: Создание хранилища перед первым бэкапом (выполняется один раз):
 # & $ResticExe init
+# $env:RESTIC_PASSWORD = $env:RESTIC_PASSWORD_TO
 # & $ResticExe -r $SecondaryRepo init
 
 # --- ФУНКЦИЯ УВЕДОМЛЕНИЙ ---
@@ -343,35 +467,72 @@ try {
     } else {
         $ParentDir = Split-Path -Path $Source -Parent
         $TargetName = Split-Path -Path $Source -Leaf
-        Set-Location -Path $ParentDir
+        Push-Location -Path $ParentDir
         $Targets = $TargetName
     }
 
     $ErrorActionPreference = "Continue"
 
-    # 1. Бэкап
-    $CurrentStage = "Backup"
-    & $ResticExe backup $Targets $ResticOptions --tag "local" 2>&1 | Out-File -FilePath "$LogFile" -Append
-    if ($LASTEXITCODE -ne 0) { throw "Backup failed." }
+    try {
+        # 1. Бэкап
+        $CurrentStage = "Backup"
+        Invoke-ResticLogged backup $Targets $ResticOptions --tag "local"
 
-    # 2. Копирование (при наличии настроек)
-    $CopyStatus = ""
-    if ($SecondaryRepo) {
-        $CurrentStage = "Copy to Secondary"
-        Add-Content $LogFile "$(Get-Date): --- Copying ---"
-        & $ResticExe copy --to-repo $SecondaryRepo 2>&1 | Out-File -FilePath "$LogFile" -Append
-        if ($LASTEXITCODE -ne 0) { throw "Copy to secondary repository failed." }
-        $CopyStatus = " and Copy"
+        # 2. Копирование (при наличии настроек)
+        $CopyStatus = ""
+        if ($SecondaryRepo) {
+            $CurrentStage = "Copy to Secondary"
+            Add-Content $LogFile "$(Get-Date): --- Copying ---"
+            $PrimaryRepository = $env:RESTIC_REPOSITORY
+            $PrimaryPassword = $env:RESTIC_PASSWORD
+            $PrimaryPasswordFile = $env:RESTIC_PASSWORD_FILE
+
+            $env:RESTIC_FROM_REPOSITORY = $env:RESTIC_REPOSITORY
+            $env:RESTIC_FROM_PASSWORD = $env:RESTIC_PASSWORD
+            $env:RESTIC_FROM_PASSWORD_FILE = $env:RESTIC_PASSWORD_FILE
+            $env:RESTIC_REPOSITORY = $SecondaryRepo
+
+            if ($env:RESTIC_PASSWORD_TO) {
+                $env:RESTIC_PASSWORD = $env:RESTIC_PASSWORD_TO
+                Remove-Item Env:RESTIC_PASSWORD_FILE -ErrorAction SilentlyContinue
+            }
+            elseif ($env:RESTIC_PASSWORD_FILE_TO) {
+                $env:RESTIC_PASSWORD_FILE = $env:RESTIC_PASSWORD_FILE_TO
+                Remove-Item Env:RESTIC_PASSWORD -ErrorAction SilentlyContinue
+            }
+
+            Invoke-ResticLogged copy --from-repo $env:RESTIC_FROM_REPOSITORY
+
+            $env:RESTIC_REPOSITORY = $PrimaryRepository
+            if ($PrimaryPassword) {
+                $env:RESTIC_PASSWORD = $PrimaryPassword
+            }
+            else {
+                Remove-Item Env:RESTIC_PASSWORD -ErrorAction SilentlyContinue
+            }
+            if ($PrimaryPasswordFile) {
+                $env:RESTIC_PASSWORD_FILE = $PrimaryPasswordFile
+            }
+            else {
+                Remove-Item Env:RESTIC_PASSWORD_FILE -ErrorAction SilentlyContinue
+            }
+            $CopyStatus = " and Copy"
+        }
+
+        # 3. Очистка и Проверка
+        $CurrentStage = "Maintenance (Forget/Check)"
+        Invoke-ResticLogged forget --keep-daily 7 --keep-weekly 4 --keep-monthly 12 --prune
+        Invoke-ResticLogged check
+
+        Add-Content $LogFile "$(Get-Date): --- Done ---"
+        Send-Ntfy "✅ Backup$CopyStatus on $($env:COMPUTERNAME) completed successfully." "Success" "heavy_check_mark"
     }
-
-    # 3. Очистка и Проверка
-    $CurrentStage = "Maintenance (Forget/Check)"
-    & $ResticExe forget --keep-daily 7 --keep-weekly 4 --keep-monthly 12 --prune 2>&1 | Out-File -FilePath "$LogFile" -Append
-    & $ResticExe check 2>&1 | Out-File -FilePath "$LogFile" -Append
-
-    $ErrorActionPreference = "Stop"
-    Add-Content $LogFile "$(Get-Date): --- Done ---"
-    Send-Ntfy "✅ Backup$CopyStatus on $($env:COMPUTERNAME) completed successfully." "Success" "heavy_check_mark"
+    finally {
+        $ErrorActionPreference = "Stop"
+        if (-not ($Source -is [array])) {
+            Pop-Location
+        }
+    }
 }
 catch {
     Send-Ntfy "❌ Error during $CurrentStage on $($env:COMPUTERNAME): $($_.Exception.Message). Check log: $LogFile" "Backup Failed" "warning,skull"
