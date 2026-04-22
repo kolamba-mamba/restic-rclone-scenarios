@@ -45,6 +45,7 @@ export RESTIC_PASSWORD="ваш_пароль"
 # export RESTIC_PASSWORD_FILE_TO="/path/to/password2.txt"
 
 # Источники (Варианты: Один путь / Массив путей)
+# Пути передаются в restic как есть и сохраняются в snapshot в исходном виде
 SOURCE="/home/user/data"
 # SOURCE=("/home/user/data" "/var/www/html")
 
@@ -66,15 +67,19 @@ echo "$(date): --- Start Backup ---" >> "$LOG_FILE"
 
 # 1. Выполнение бэкапа в основное хранилище
 if [[ "$(declare -p SOURCE 2>/dev/null)" =~ "declare -a" ]]; then
-    # Использование полных путей для массива
-    restic backup "${SOURCE[@]}" "${RESTIC_OPTIONS[@]}" --tag "local" >> "$LOG_FILE" 2>&1
+    SOURCES_ARR=("${SOURCE[@]}")
 else
-    # Переход в родительский каталог для красоты имен в бэкапе
-    PARENT_DIR=$(dirname "$SOURCE")
-    TARGET_NAME=$(basename "$SOURCE")
-    cd "$PARENT_DIR" || exit
-    restic backup "$TARGET_NAME" "${RESTIC_OPTIONS[@]}" --tag "local" >> "$LOG_FILE" 2>&1
+    SOURCES_ARR=("$SOURCE")
 fi
+
+for src in "${SOURCES_ARR[@]}"; do
+    if [ ! -e "$src" ]; then
+        echo "$(date): Missing source: $src" >> "$LOG_FILE"
+        exit 1
+    fi
+done
+
+restic backup "${SOURCES_ARR[@]}" "${RESTIC_OPTIONS[@]}" --tag "local" >> "$LOG_FILE" 2>&1
 
 # 2. Копирование в дополнительное хранилище (при наличии настроек)
 if [ -n "$SECONDARY_REPOSITORY" ]; then
@@ -147,6 +152,7 @@ export RESTIC_PASSWORD="ваш_пароль"
 # export RESTIC_PASSWORD_FILE_TO="/path/to/password2.txt"
 
 # Источники (Варианты: Один путь / Массив)
+# Пути передаются в restic как есть и сохраняются в snapshot в исходном виде
 SOURCE="/home/user/data"
 # SOURCE=("/home/user/data" "/var/www/html")
 
@@ -186,13 +192,19 @@ echo "$(date): --- Start ---" >> "$LOG_FILE"
 # 1. Бэкап
 CURRENT_STAGE="Backup"
 if [[ "$(declare -p SOURCE 2>/dev/null)" =~ "declare -a" ]]; then
-    restic backup "${SOURCE[@]}" "${RESTIC_OPTIONS[@]}" --tag "local" >> "$LOG_FILE" 2>&1
+    SOURCES_ARR=("${SOURCE[@]}")
 else
-    PARENT_DIR=$(dirname "$SOURCE")
-    TARGET_NAME=$(basename "$SOURCE")
-    cd "$PARENT_DIR" || exit
-    restic backup "$TARGET_NAME" "${RESTIC_OPTIONS[@]}" --tag "local" >> "$LOG_FILE" 2>&1
+    SOURCES_ARR=("$SOURCE")
 fi
+
+for src in "${SOURCES_ARR[@]}"; do
+    if [ ! -e "$src" ]; then
+        echo "$(date): Missing source: $src" >> "$LOG_FILE"
+        exit 1
+    fi
+done
+
+restic backup "${SOURCES_ARR[@]}" "${RESTIC_OPTIONS[@]}" --tag "local" >> "$LOG_FILE" 2>&1
 
 # 2. Копирование (при наличии настроек)
 COPY_STATUS=""
@@ -272,6 +284,7 @@ $env:RESTIC_PASSWORD = "ваш_пароль"
 # $env:RESTIC_PASSWORD_FILE_TO = "C:\path\to\password2.txt"
 
 # Источники (Варианты: Один путь / Список путей)
+# Пути передаются в restic как есть и сохраняются в snapshot в исходном виде
 $Source = "C:\Users\Admin\Documents"
 # $Source = @("C:\Data", "D:\Projects")
 
@@ -297,6 +310,19 @@ function Invoke-ResticLogged {
     }
 }
 
+function Test-BackupSources {
+    param (
+        [string[]]$Paths
+    )
+
+    foreach ($PathItem in $Paths) {
+        if (-not (Test-Path -LiteralPath $PathItem)) {
+            Add-Content $LogFile "$(Get-Date): Missing source: $PathItem"
+            throw "Missing source: $PathItem"
+        }
+    }
+}
+
 # ВАЖНО: Создание хранилища перед первым бэкапом (выполняется один раз):
 # & $ResticExe init
 # $env:RESTIC_PASSWORD = $env:RESTIC_PASSWORD_TO
@@ -306,20 +332,14 @@ function Invoke-ResticLogged {
 Add-Content $LogFile "$(Get-Date): --- Start Backup ---"
 
 # Подготовка путей
-if ($Source -is [array]) {
-    $Targets = $Source
-} else {
-    $ParentDir = Split-Path -Path $Source -Parent
-    $TargetName = Split-Path -Path $Source -Leaf
-    Push-Location -Path $ParentDir
-    $Targets = $TargetName
-}
+$Targets = [array]$Source
 
 # Временно отключаем остановку на stderr
 $ErrorActionPreference = "Continue"
 
 try {
     # 1. Выполнение бэкапа
+    Test-BackupSources -Paths $Targets
     Invoke-ResticLogged backup $Targets $ResticOptions --tag "local"
 
     # 2. Копирование (при наличии настроек)
@@ -370,9 +390,6 @@ try {
 }
 finally {
     $ErrorActionPreference = "Stop"
-    if (-not ($Source -is [array])) {
-        Pop-Location
-    }
 }
 ```
 
@@ -407,6 +424,7 @@ $env:RESTIC_PASSWORD = "ваш_пароль"
 # $env:RESTIC_PASSWORD_FILE_TO = "C:\path\to\password2.txt"
 
 # Источники (Варианты: Один путь / Список путей)
+# Пути передаются в restic как есть и сохраняются в snapshot в исходном виде
 $Source = "C:\Users\Admin\Documents"
 # $Source = @("C:\Data", "D:\Projects")
 
@@ -429,6 +447,19 @@ function Invoke-ResticLogged {
     & $ResticExe @Arguments 2>&1 | Out-File -FilePath "$LogFile" -Append
     if ($LASTEXITCODE -ne 0) {
         throw "Restic failed: $($Arguments -join ' ')"
+    }
+}
+
+function Test-BackupSources {
+    param (
+        [string[]]$Paths
+    )
+
+    foreach ($PathItem in $Paths) {
+        if (-not (Test-Path -LiteralPath $PathItem)) {
+            Add-Content $LogFile "$(Get-Date): Missing source: $PathItem"
+            throw "Missing source: $PathItem"
+        }
     }
 }
 
@@ -462,20 +493,14 @@ $CurrentStage = "Initialization"
 try {
     Add-Content $LogFile "$(Get-Date): --- Start ---"
 
-    if ($Source -is [array]) {
-        $Targets = $Source
-    } else {
-        $ParentDir = Split-Path -Path $Source -Parent
-        $TargetName = Split-Path -Path $Source -Leaf
-        Push-Location -Path $ParentDir
-        $Targets = $TargetName
-    }
+    $Targets = [array]$Source
 
     $ErrorActionPreference = "Continue"
 
     try {
         # 1. Бэкап
         $CurrentStage = "Backup"
+        Test-BackupSources -Paths $Targets
         Invoke-ResticLogged backup $Targets $ResticOptions --tag "local"
 
         # 2. Копирование (при наличии настроек)
@@ -529,9 +554,6 @@ try {
     }
     finally {
         $ErrorActionPreference = "Stop"
-        if (-not ($Source -is [array])) {
-            Pop-Location
-        }
     }
 }
 catch {
