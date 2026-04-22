@@ -302,6 +302,10 @@ $ResticOptions = @()
 # Логирование
 $LogFile = "C:\Logs\backup.log"
 
+# ВАЖНО: Создание хранилища перед первым бэкапом (выполняется один раз):
+# & $ResticExe init
+# $env:RESTIC_PASSWORD = $env:RESTIC_PASSWORD_TO
+# & $ResticExe -r $SecondaryRepo init
 
 # --- ФУНКЦИЯ ЗАПУСКА ---
 function Invoke-ResticLogged {
@@ -329,10 +333,6 @@ function Test-BackupSources {
     }
 }
 
-# ВАЖНО: Создание хранилища перед первым бэкапом (выполняется один раз):
-# & $ResticExe init
-# $env:RESTIC_PASSWORD = $env:RESTIC_PASSWORD_TO
-# & $ResticExe -r $SecondaryRepo init
 
 # --- РАБОТА ---
 Add-Content $LogFile "$(Get-Date): --- Start Backup ---"
@@ -346,7 +346,8 @@ $ErrorActionPreference = "Continue"
 try {
     # 1. Выполнение бэкапа
     Test-BackupSources -Paths $Targets
-    Invoke-ResticLogged backup $Targets $ResticOptions --tag "local"
+    $BackupArgs = @("backup") + $Targets + $ResticOptions + @("--tag", "local")
+    Invoke-ResticLogged -Arguments $BackupArgs
 
     # 2. Копирование (при наличии настроек)
     if ($SecondaryRepo) {
@@ -369,7 +370,8 @@ try {
             Remove-Item Env:RESTIC_PASSWORD -ErrorAction SilentlyContinue
         }
 
-        Invoke-ResticLogged copy --from-repo $env:RESTIC_FROM_REPOSITORY
+        $CopyArgs = @("copy", "--from-repo", $env:RESTIC_FROM_REPOSITORY)
+        Invoke-ResticLogged -Arguments $CopyArgs
 
         $env:RESTIC_REPOSITORY = $PrimaryRepository
         if ($PrimaryPassword) {
@@ -387,10 +389,12 @@ try {
     }
 
     # 3. Удаление старых копий
-    Invoke-ResticLogged forget --keep-daily 7 --keep-weekly 4 --keep-monthly 12 --prune
+    $ForgetArgs = @("forget", "--keep-daily", "7", "--keep-weekly", "4", "--keep-monthly", "12", "--prune")
+    Invoke-ResticLogged -Arguments $ForgetArgs
 
     # 4. Проверка данных
-    Invoke-ResticLogged check
+    $CheckArgs = @("check")
+    Invoke-ResticLogged -Arguments $CheckArgs
 
     Add-Content $LogFile "$(Get-Date): --- Done ---"
 }
@@ -442,6 +446,10 @@ $ResticOptions = @()
 # Логирование
 $LogFile = "C:\Logs\backup.log"
 
+# ВАЖНО: Создание хранилища перед первым бэкапом (выполняется один раз):
+# & $ResticExe init
+# $env:RESTIC_PASSWORD = $env:RESTIC_PASSWORD_TO
+# & $ResticExe -r $SecondaryRepo init
 
 # --- ФУНКЦИЯ ЗАПУСКА ---
 function Invoke-ResticLogged {
@@ -469,10 +477,6 @@ function Test-BackupSources {
     }
 }
 
-# ВАЖНО: Создание хранилища перед первым бэкапом (выполняется один раз):
-# & $ResticExe init
-# $env:RESTIC_PASSWORD = $env:RESTIC_PASSWORD_TO
-# & $ResticExe -r $SecondaryRepo init
 
 # --- ФУНКЦИЯ УВЕДОМЛЕНИЙ ---
 function Send-Ntfy ($Message, $Title = "Notification", $Tags = "") {
@@ -507,7 +511,8 @@ try {
         # 1. Бэкап
         $CurrentStage = "Backup"
         Test-BackupSources -Paths $Targets
-        Invoke-ResticLogged backup $Targets $ResticOptions --tag "local"
+        $BackupArgs = @("backup") + $Targets + $ResticOptions + @("--tag", "local")
+        Invoke-ResticLogged -Arguments $BackupArgs
 
         # 2. Копирование (при наличии настроек)
         $CopyStatus = ""
@@ -532,7 +537,8 @@ try {
                 Remove-Item Env:RESTIC_PASSWORD -ErrorAction SilentlyContinue
             }
 
-            Invoke-ResticLogged copy --from-repo $env:RESTIC_FROM_REPOSITORY
+            $CopyArgs = @("copy", "--from-repo", $env:RESTIC_FROM_REPOSITORY)
+            Invoke-ResticLogged -Arguments $CopyArgs
 
             $env:RESTIC_REPOSITORY = $PrimaryRepository
             if ($PrimaryPassword) {
@@ -552,8 +558,10 @@ try {
 
         # 3. Очистка и Проверка
         $CurrentStage = "Maintenance (Forget/Check)"
-        Invoke-ResticLogged forget --keep-daily 7 --keep-weekly 4 --keep-monthly 12 --prune
-        Invoke-ResticLogged check
+        $ForgetArgs = @("forget", "--keep-daily", "7", "--keep-weekly", "4", "--keep-monthly", "12", "--prune")
+        Invoke-ResticLogged -Arguments $ForgetArgs
+        $CheckArgs = @("check")
+        Invoke-ResticLogged -Arguments $CheckArgs
 
         Add-Content $LogFile "$(Get-Date): --- Done ---"
         Send-Ntfy "✅ Backup$CopyStatus on $($env:COMPUTERNAME) completed successfully." "Success" "heavy_check_mark"
