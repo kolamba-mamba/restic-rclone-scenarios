@@ -21,6 +21,21 @@
 
 ---
 
+## Структура проекта
+
+```text
+├── README.md                      # Главная страница проекта
+└── scenarios/                     # Сценарии бекапа/синхронизации с документацией
+    ├── 00-automation.md           # Настройка  systemd/cron/task-sheduler lin/win
+    ├── 00-manage-data.md          # Управление копиями и восстановление
+    ├── 00-monitoring-ntfy.md      # Настройка системы оповещений на базе nfty.sh
+    ├── 00-rclone-config.md        # Предварительна настройка соединения Rclone
+    ├── 01-universal-rclone.md     # Сценарии простой синхронизации (rclone) lin/win
+    └── 02-universal-restic.md     # Основные скрипты бэкапов (restic/rclone) lin/win
+```
+
+---
+
 ## 1. Установка программ
 
 ### Windows (через Scoop)
