@@ -182,6 +182,13 @@ send_ntfy() {
         "https://ntfy.sh/$NTFY_TOPIC" > /dev/null || echo "Failed to send notification"
 }
 
+fail_with_ntfy() {
+    local MESSAGE="$1"
+    echo "$(date): $MESSAGE" >> "$LOG_FILE"
+    send_ntfy "❌ Error during $CURRENT_STAGE on $(hostname): $MESSAGE. Check log: $LOG_FILE" "Backup Failed" "warning,skull"
+    exit 1
+}
+
 # --- МОНИТОРИНГ ОШИБОК ---
 CURRENT_STAGE="Initialization"
 trap 'send_ntfy "❌ Error during $CURRENT_STAGE on $(hostname). Check log: $LOG_FILE" "Backup Failed" "warning,skull"' ERR
@@ -199,8 +206,7 @@ fi
 
 for src in "${SOURCES_ARR[@]}"; do
     if [ ! -e "$src" ]; then
-        echo "$(date): Missing source: $src" >> "$LOG_FILE"
-        exit 1
+        fail_with_ntfy "Missing source: $src"
     fi
 done
 
