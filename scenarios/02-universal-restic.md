@@ -54,6 +54,10 @@ RESTIC_OPTIONS=()
 # RESTIC_OPTIONS=(--exclude-caches)
 # RESTIC_OPTIONS=(--one-file-system)
 
+# Политика хранения копий (Варианты: Расширенная / Простая)
+RETENTION_POLICY="--keep-daily 7 --keep-weekly 4 --keep-monthly 12"
+# RETENTION_POLICY="--keep-last 5"
+
 # Логирование
 LOG_FILE="/var/log/restic_backup.log"
 
@@ -116,7 +120,8 @@ if [ -n "$SECONDARY_REPOSITORY" ]; then
 fi
 
 # 3. Очистка старых копий (в основном хранилище)
-restic forget --keep-daily 7 --keep-weekly 4 --keep-monthly 12 --prune >> "$LOG_FILE" 2>&1
+# shellcheck disable=SC2086
+restic forget $RETENTION_POLICY --prune >> "$LOG_FILE" 2>&1
 
 # 4. Проверка на ошибки
 restic check >> "$LOG_FILE" 2>&1
@@ -160,6 +165,10 @@ SOURCE="/home/user/data"
 RESTIC_OPTIONS=()
 # RESTIC_OPTIONS=(--exclude-caches)
 # RESTIC_OPTIONS=(--one-file-system)
+
+# Политика хранения копий (Варианты: Расширенная / Простая)
+RETENTION_POLICY="--keep-daily 7 --keep-weekly 4 --keep-monthly 12"
+# RETENTION_POLICY="--keep-last 5"
 
 # Логирование
 LOG_FILE="/var/log/restic_backup.log"
@@ -251,7 +260,8 @@ fi
 
 # 3. Обслуживание
 CURRENT_STAGE="Maintenance (Forget/Check)"
-restic forget --keep-daily 7 --keep-weekly 4 --keep-monthly 12 --prune >> "$LOG_FILE" 2>&1
+# shellcheck disable=SC2086
+restic forget $RETENTION_POLICY --prune >> "$LOG_FILE" 2>&1
 restic check >> "$LOG_FILE" 2>&1
 
 echo "$(date): --- Done ---" >> "$LOG_FILE"
@@ -389,7 +399,7 @@ try {
     }
 
     # 3. Удаление старых копий
-    $ForgetArgs = @("forget", "--keep-daily", "7", "--keep-weekly", "4", "--keep-monthly", "12", "--prune")
+    $ForgetArgs = @("forget") + $RetentionPolicy + @("--prune")
     Invoke-ResticLogged -Arguments $ForgetArgs
 
     # 4. Проверка данных
@@ -558,7 +568,7 @@ try {
 
         # 3. Очистка и Проверка
         $CurrentStage = "Maintenance (Forget/Check)"
-        $ForgetArgs = @("forget", "--keep-daily", "7", "--keep-weekly", "4", "--keep-monthly", "12", "--prune")
+        $ForgetArgs = @("forget") + $RetentionPolicy + @("--prune")
         Invoke-ResticLogged -Arguments $ForgetArgs
         $CheckArgs = @("check")
         Invoke-ResticLogged -Arguments $CheckArgs
