@@ -49,10 +49,10 @@ export RESTIC_PASSWORD="ваш_пароль"
 SOURCE="/home/user/data"
 # SOURCE=("/home/user/data" "/var/www/html")
 
-# Параметры бэкапа (Варианты: Нет / Пропуск кэша / Одна файловая система)
+# Опции Restic
 RESTIC_OPTIONS=()
-# RESTIC_OPTIONS=(--exclude-caches)
-# RESTIC_OPTIONS=(--one-file-system)
+# Настройка необходимых флагов. Одна ФС / Кэш / Исключения / Файл исключений
+# RESTIC_OPTIONS=(--one-file-system --exclude-caches --exclude="/var/tmp" --exclude-file="/etc/restic/excludes.txt")
 
 # Политика хранения копий (Варианты: Расширенная / Простая)
 RETENTION_POLICY="--keep-daily 7 --keep-weekly 4 --keep-monthly 12"
@@ -161,10 +161,10 @@ export RESTIC_PASSWORD="ваш_пароль"
 SOURCE="/home/user/data"
 # SOURCE=("/home/user/data" "/var/www/html")
 
-# Параметры бэкапа (Варианты: Нет / Пропуск кэша / Одна файловая система)
+# Опции Restic
 RESTIC_OPTIONS=()
-# RESTIC_OPTIONS=(--exclude-caches)
-# RESTIC_OPTIONS=(--one-file-system)
+# Настройка необходимых флагов. Одна ФС / Кэш / Исключения / Файл исключений
+# RESTIC_OPTIONS=(--one-file-system --exclude-caches --exclude="/var/tmp" --exclude-file="/etc/restic/excludes.txt")
 
 # Политика хранения копий (Варианты: Расширенная / Простая)
 RETENTION_POLICY="--keep-daily 7 --keep-weekly 4 --keep-monthly 12"
@@ -304,10 +304,10 @@ $env:RESTIC_PASSWORD = "ваш_пароль"
 $Source = "C:\Users\Admin\Documents"
 # $Source = @("C:\Data", "D:\Projects")
 
-# Параметры бэкапа (Варианты: Нет / VSS снимок / Пропуск кэша)
+# Опции Restic
 $ResticOptions = @()
-# $ResticOptions = @("--use-fs-snapshot")
-# $ResticOptions = @("--exclude-caches")
+# Настройка необходимых флагов. VSS / Кэш / Исключения / Файл исключений
+# $ResticOptions = @("--use-fs-snapshot", "--exclude-caches", "--exclude=C:\Windows\Temp", "--exclude-file=C:\bk\excludes.txt")
 
 # Логирование
 $LogFile = "C:\Logs\backup.log"
@@ -448,10 +448,10 @@ $env:RESTIC_PASSWORD = "ваш_пароль"
 $Source = "C:\Users\Admin\Documents"
 # $Source = @("C:\Data", "D:\Projects")
 
-# Параметры бэкапа (Варианты: Нет / VSS снимок / Пропуск кэша)
+# Опции Restic
 $ResticOptions = @()
-# $ResticOptions = @("--use-fs-snapshot")
-# $ResticOptions = @("--exclude-caches")
+# Настройка необходимых флагов. VSS / Кэш / Исключения / Файл исключений
+# $ResticOptions = @("--use-fs-snapshot", "--exclude-caches", "--exclude=C:\Windows\Temp", "--exclude-file=C:\bk\excludes.txt")
 
 # Логирование
 $LogFile = "C:\Logs\backup.log"
